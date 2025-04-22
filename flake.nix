@@ -2,77 +2,103 @@
   description = "Bitcoin development environment";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/24.11";
+    nixpkgs-lief.url = "github:NixOS/nixpkgs?rev=50dc918cfe0dd0419403c957bcf395e881214416"; # Pinned commit for lief 0.13.2
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { nixpkgs, ... }:
-    let
-      system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; };
-      binDirs = [ "./build/bin" "./build/bin/qt" ];
-    in
-    {
-      devShells.${system}.default = pkgs.mkShell {
-        # Build-time tools
-        nativeBuildInputs = with pkgs; [
+  outputs = { nixpkgs, nixpkgs-lief, flake-utils, ... }:
+    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-darwin" ] (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+        pkgs-lief = import nixpkgs-lief { inherit system; }; # Pinned Nixpkgs for lief
+        isLinux = pkgs.stdenv.isLinux;
+        binDirs = [ "./build/bin" "./build/bin/qt" ];
+
+        # Common dependencies for both platforms
+        commonNativeBuildInputs = with pkgs; [
           byacc
           ccache
           clang-tools_19
           clang_19
           cmake
-          gcc14
-          gdb
-          hexdump
+          gnumake
+          gnum4
+          mold-wrapped
+          ninja
+          pkg-config
+        ];
+
+        # Linux-specific dependencies
+        linuxNativeBuildInputs = with pkgs; [
           libsystemtap
           linuxPackages.bcc
           linuxPackages.bpftrace
-          llvmPackages.bintools
-          ninja
-          pkg-config
-          python312
-          python312Packages.autopep8
-          python312Packages.flake8
-          python312Packages.mypy
-          python312Packages.pyzmq
-          python312Packages.requests
         ];
 
-        # Runtime dependencies
+        # Combine dependencies based on platform
+        nativeBuildInputs = commonNativeBuildInputs ++ (if isLinux then linuxNativeBuildInputs else []);
+
+        # Override python311Packages.lief to use the pinned version
+        pythonWithLief = pkgs.python311.override {
+          packageOverrides = self: super: {
+            lief = pkgs-lief.python311Packages.lief;
+          };
+        };
+
+        # Common runtime dependencies
         buildInputs = with pkgs; [
           boost
-          libevent
-          sqlite
           capnproto
+          codespell
           db4
+          gdb
+          hexdump
+          libevent
+          python311Packages.flake8
+          python311Packages.mypy
+          python311Packages.pyzmq
+          python311Packages.vulture
+          pythonWithLief
           qrencode
-          zeromq
           qt6.qtbase
           qt6.qttools
+          sqlite
+          uv
+          zeromq
         ];
 
+        # Platform-specific shell hook
         shellHook = ''
-          BCC_EGG=${pkgs.linuxPackages.bcc}/${pkgs.python3.sitePackages}/bcc-${pkgs.linuxPackages.bcc.version}-py3.${pkgs.python3.sourceVersion.minor}.egg
-          if [ -f $BCC_EGG ]; then
-            export PYTHONPATH="$PYTHONPATH:$BCC_EGG"
-          else
-            echo "The bcc egg $BCC_EGG does not exist. Maybe the python or bcc version is different?"
-          fi
-
-          # Use clang by default
+          # Use clang as default
           export CC=clang
           export CXX=clang++
 
           # Use Ninja generator 🥷
           export CMAKE_GENERATOR="Ninja"
 
-          # Misc bitcoin options
-          export LSAN_OPTIONS="suppressions=$(pwd)/test/sanitizer_suppressions/lsan"
-          export TSAN_OPTIONS="suppressions=$(pwd)/test/sanitizer_suppressions/tsan:halt_on_error=1:second_deadlock_stack=1"
-          export UBSAN_OPTIONS="suppressions=$(pwd)/test/sanitizer_suppressions/ubsan:print_stacktrace=1:halt_on_error=1:report_error_type=1"
+          # Use mold linker 🦠
+          export LDFLAGS="-fuse-ld=mold"
 
-          # Add output build dir to $PATH
+          # Add build dirs to PATH
           export PATH=$PATH:${builtins.concatStringsSep ":" binDirs}
+
+          ${if isLinux then ''
+            # Linux-specific settings
+            BCC_EGG=${pkgs.linuxPackages.bcc}/${pkgs.python3.sitePackages}/bcc-${pkgs.linuxPackages.bcc.version}-py3.${pkgs.python3.sourceVersion.minor}.egg
+            if [ -f $BCC_EGG ]; then
+              export PYTHONPATH="$PYTHONPATH:$BCC_EGG"
+            else
+              echo "Warning: The bcc egg $BCC_EGG does not exist. Skipping bcc PYTHONPATH setup."
+            fi
+          '' else ''
+          ''}
         '';
-      };
-    };
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          inherit nativeBuildInputs buildInputs shellHook;
+        };
+      }
+    );
 }
