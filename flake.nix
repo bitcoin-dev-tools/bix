@@ -10,18 +10,20 @@
   outputs = { nixpkgs, nixpkgs-lief, flake-utils, ... }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-darwin" ] (system:
       let
-        pkgs = import nixpkgs { inherit system; };
-        pkgs-lief = import nixpkgs-lief { inherit system; }; # Pinned Nixpkgs for lief
-        isLinux = pkgs.stdenv.isLinux;
         binDirs = [ "./build/bin" "./build/bin/qt" ];
+        isLinux = pkgs.stdenv.isLinux;
+        lib = pkgs.lib;
+        pkgs = import nixpkgs { inherit system; };
+        pkgs-lief = import nixpkgs-lief { inherit system; };
 
-        # Common dependencies for both platforms
+        # Common dependencies
         commonNativeBuildInputs = with pkgs; [
           byacc
           ccache
           clang-tools_19
           clang_19
           cmake
+          gcc14 # Match this to LD_LIBRARY_PATH for the devShell
           gnumake
           gnum4
           mold-wrapped
@@ -29,24 +31,21 @@
           pkg-config
         ];
 
-        # Linux-specific dependencies
         linuxNativeBuildInputs = with pkgs; [
           libsystemtap
           linuxPackages.bcc
           linuxPackages.bpftrace
         ];
 
-        # Combine dependencies based on platform
         nativeBuildInputs = commonNativeBuildInputs ++ (if isLinux then linuxNativeBuildInputs else []);
 
-        # Override python311Packages.lief to use the pinned version
         pythonWithLief = pkgs.python311.override {
           packageOverrides = self: super: {
             lief = pkgs-lief.python311Packages.lief;
           };
         };
 
-        # Common runtime dependencies
+        # Runtime dependencies
         buildInputs = with pkgs; [
           boost
           capnproto
@@ -68,20 +67,14 @@
           zeromq
         ];
 
-        # Platform-specific shell hook
         shellHook = ''
-          # Use clang as default
-          export CC=clang
-          export CXX=clang++
-
-          # Use Ninja generator 🥷
-          export CMAKE_GENERATOR="Ninja"
-
-          # Use mold linker 🦠
-          export LDFLAGS="-fuse-ld=mold"
-
           # Add build dirs to PATH
           export PATH=$PATH:${builtins.concatStringsSep ":" binDirs}
+
+          export CC=clang
+          export CXX=clang++
+          export CMAKE_GENERATOR=Ninja
+          export LDFLAGS="-fuse-ld=mold"
 
           ${if isLinux then ''
             # Linux-specific settings
@@ -97,6 +90,8 @@
       in
       {
         devShells.default = pkgs.mkShell {
+          LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.gcc14.cc pkgs.capnproto ];
+          LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
           inherit nativeBuildInputs buildInputs shellHook;
         };
       }

@@ -1,5 +1,6 @@
 let
   pkgs = import <nixpkgs> { system = "x86_64-linux"; };
+  inherit (pkgs) lib;
 
   # Pinned for lief @ v0.13.2
   liefPkgs = import (builtins.fetchGit {
@@ -10,24 +11,29 @@ let
   }) { system = "x86_64-linux"; };
 
   binDirs = [ "./build/bin" "./build/bin/qt" ];
-  lib = pkgs.lib;
 in
 pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
     # build tools
-    boost
+    binutils
     ccache
     clang-tools_19
     clang_19
     cmake
+    curlMinimal
     gcc14
-    gnumake
     gnum4
-    mold
+    gnumake
+    lld_19
+    mold-wrapped
     ninja
     pkg-config
+    which
+    ];
 
+    buildInputs = with pkgs; [
     # build dependencies
+    boost
     capnproto
     db4
     libevent
@@ -50,6 +56,8 @@ pkgs.mkShell {
     python311Packages.requests
     liefPkgs.python311Packages.lief
 
+    doxygen
+
     # Benchmarking
     python311Packages.pyperf
 
@@ -66,7 +74,11 @@ pkgs.mkShell {
     qt6.qttools
   ];
 
-  # Set locale to the system locale
+  CC = "clang";
+  CMAKE_GENERATOR="Ninja";
+  CXX = "clang++";
+  LDFLAGS = "-fuse-ld=lld";
+  LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.stdenv.cc.cc pkgs.capnproto ];
   LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
 
   shellHook = ''
@@ -77,22 +89,7 @@ pkgs.mkShell {
       echo "The bcc egg $BCC_EGG does not exist. Maybe the python or bcc version is different?"
     fi
 
-    # Use clang by default
-    export CC=clang
-    export CXX=clang++
-
-    # Use Ninja generator 🥷
-    export CMAKE_GENERATOR="Ninja"
-
-    # Use mold linker 🦠
-    export LDFLAGS="-fuse-ld=mold"
-
-    # Misc bitcoin options
-    export LSAN_OPTIONS="suppressions=$(pwd)/test/sanitizer_suppressions/lsan"
-    export TSAN_OPTIONS="suppressions=$(pwd)/test/sanitizer_suppressions/tsan:halt_on_error=1:second_deadlock_stack=1"
-    export UBSAN_OPTIONS="suppressions=$(pwd)/test/sanitizer_suppressions/ubsan:print_stacktrace=1:halt_on_error=1:report_error_type=1"
-
     # Add output build dir to $PATH
-    export PATH=$PATH:${builtins.concatStringsSep ":" binDirs}
+    export PATH=${builtins.concatStringsSep ":" binDirs}:$PATH
   '';
 }
