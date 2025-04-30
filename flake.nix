@@ -3,18 +3,16 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/24.11";
-    nixpkgs-lief.url = "github:NixOS/nixpkgs?rev=50dc918cfe0dd0419403c957bcf395e881214416"; # Pinned commit for lief 0.13.2
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { nixpkgs, nixpkgs-lief, flake-utils, ... }:
+  outputs = { nixpkgs, flake-utils, ... }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-darwin" ] (system:
       let
         binDirs = [ "./build/bin" "./build/bin/qt" ];
         isLinux = pkgs.stdenv.isLinux;
         lib = pkgs.lib;
         pkgs = import nixpkgs { inherit system; };
-        pkgs-lief = import nixpkgs-lief { inherit system; };
 
         # Common dependencies
         commonNativeBuildInputs = with pkgs; [
@@ -23,7 +21,7 @@
           clang-tools_19
           clang_19
           cmake
-          gcc14 # Match this to LD_LIBRARY_PATH for the devShell
+          gcc14
           gnumake
           gnum4
           mold-wrapped
@@ -39,12 +37,6 @@
 
         nativeBuildInputs = commonNativeBuildInputs ++ (if isLinux then linuxNativeBuildInputs else []);
 
-        pythonWithLief = pkgs.python311.override {
-          packageOverrides = self: super: {
-            lief = pkgs-lief.python311Packages.lief;
-          };
-        };
-
         # Runtime dependencies
         buildInputs = with pkgs; [
           boost
@@ -54,16 +46,21 @@
           gdb
           hexdump
           libevent
-          python311Packages.flake8
-          python311Packages.mypy
-          python311Packages.pyzmq
-          python311Packages.vulture
-          pythonWithLief
+          libsystemtap
+          linuxPackages.bcc
+          linuxPackages.bpftrace
+          python312Packages.bcc
+          python312Packages.flake8
+          python312Packages.lief
+          python312Packages.mypy
+          python312Packages.pyzmq
+          python312Packages.vulture
           qrencode
           qt6.qtbase
           qt6.qttools
           sqlite
           uv
+          valgrind
           zeromq
         ];
 
@@ -71,21 +68,19 @@
           # Add build dirs to PATH
           export PATH=$PATH:${builtins.concatStringsSep ":" binDirs}
 
-          export CC=clang
-          export CXX=clang++
-          export CMAKE_GENERATOR=Ninja
+          # Opinionated default compiler, linker, and Generator options
+          export CC=gcc
+          export CXX=g++
           export LDFLAGS="-fuse-ld=mold"
+          export CMAKE_GENERATOR=Ninja
 
-          ${if isLinux then ''
-            # Linux-specific settings
-            BCC_EGG=${pkgs.linuxPackages.bcc}/${pkgs.python3.sitePackages}/bcc-${pkgs.linuxPackages.bcc.version}-py3.${pkgs.python3.sourceVersion.minor}.egg
-            if [ -f $BCC_EGG ]; then
-              export PYTHONPATH="$PYTHONPATH:$BCC_EGG"
-            else
-              echo "Warning: The bcc egg $BCC_EGG does not exist. Skipping bcc PYTHONPATH setup."
-            fi
-          '' else ''
-          ''}
+          # Add bcc egg to PYTHONPATH
+          BCC_EGG=${pkgs.linuxPackages.bcc}/${pkgs.python312.sitePackages}/bcc-${pkgs.linuxPackages.bcc.version}-py3.12.egg
+          if [ -f $BCC_EGG ]; then
+            export PYTHONPATH="$PYTHONPATH:$BCC_EGG"
+          else
+            echo "Warning: The bcc egg $BCC_EGG does not exist. Skipping bcc PYTHONPATH setup."
+          fi
         '';
       in
       {
