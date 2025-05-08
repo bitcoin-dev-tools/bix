@@ -9,12 +9,10 @@
   outputs = { nixpkgs, flake-utils, ... }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-darwin" ] (system:
       let
-        binDirs = [ "./build/bin" "./build/bin/qt" ];
+        pkgs = import nixpkgs { inherit system; };
         isLinux = pkgs.stdenv.isLinux;
         lib = pkgs.lib;
-        pkgs = import nixpkgs { inherit system; };
 
-        # Common dependencies
         commonNativeBuildInputs = with pkgs; [
           byacc
           ccache
@@ -22,23 +20,32 @@
           clang_19
           cmake
           gcc14
-          gnumake
           gnum4
+          gnumake
           mold-wrapped
           ninja
           pkg-config
+          qt6.wrapQtAppsHook
         ];
 
         linuxNativeBuildInputs = with pkgs; [
           libsystemtap
           linuxPackages.bcc
           linuxPackages.bpftrace
+          python312Packages.bcc
         ];
 
         nativeBuildInputs = commonNativeBuildInputs ++ (if isLinux then linuxNativeBuildInputs else []);
 
-        # Runtime dependencies
-        buildInputs = with pkgs; [
+        pythonEnv = pkgs.python312.withPackages (ps: with ps; [
+          flake8
+          lief
+          mypy
+          pyzmq
+          vulture
+        ]);
+
+        commonBuildInputs = with pkgs; [
           boost
           capnproto
           codespell
@@ -46,15 +53,6 @@
           gdb
           hexdump
           libevent
-          libsystemtap
-          linuxPackages.bcc
-          linuxPackages.bpftrace
-          python312Packages.bcc
-          python312Packages.flake8
-          python312Packages.lief
-          python312Packages.mypy
-          python312Packages.pyzmq
-          python312Packages.vulture
           qrencode
           qt6.qtbase
           qt6.qttools
@@ -62,31 +60,28 @@
           uv
           valgrind
           zeromq
+          pythonEnv
         ];
 
+        linuxBuildInputs = with pkgs; [
+          python312Packages.bcc
+        ];
+
+        buildInputs = commonBuildInputs ++ (if isLinux then linuxBuildInputs else []);
+
         shellHook = ''
-          # Add build dirs to PATH
-          export PATH=$PATH:${builtins.concatStringsSep ":" binDirs}
-
-          # Opinionated default compiler, linker, and Generator options
-          export CC=gcc
-          export CXX=g++
-          export LDFLAGS="-fuse-ld=mold"
+          # Opinionated defaults
+          export CC=clang
+          export CXX=clang++
           export CMAKE_GENERATOR=Ninja
-
-          # Add bcc egg to PYTHONPATH
-          BCC_EGG=${pkgs.linuxPackages.bcc}/${pkgs.python312.sitePackages}/bcc-${pkgs.linuxPackages.bcc.version}-py3.12.egg
-          if [ -f $BCC_EGG ]; then
-            export PYTHONPATH="$PYTHONPATH:$BCC_EGG"
-          else
-            echo "Warning: The bcc egg $BCC_EGG does not exist. Skipping bcc PYTHONPATH setup."
-          fi
+          export LDFLAGS="-fuse-ld=mold"
         '';
       in
       {
         devShells.default = pkgs.mkShell {
           LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.gcc14.cc pkgs.capnproto ];
           LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
+          QT_PLUGIN_PATH = "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}";
           inherit nativeBuildInputs buildInputs shellHook;
         };
       }
