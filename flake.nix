@@ -46,12 +46,12 @@
           libtool
           llvmPackages_20.clang
           llvmPackages_20.clang-tools
-          mold-wrapped
           ninja
           pkg-config
           qt6.wrapQtAppsHook
         ]
         ++ lib.optionals isLinux [
+          mold-wrapped
           libsystemtap
           linuxPackages.bcc
           linuxPackages.bpftrace
@@ -67,7 +67,7 @@
           qrencode
           qt6.qtbase
           qt6.qttools
-          sqlite
+          sqlite.dev
           zeromq
         ]
         ++ lib.optionals isLinux [
@@ -102,7 +102,6 @@
           python312Packages.pyzmq
           python312Packages.vulture
           uv
-          valgrind
         ];
 
         inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE QT_PLUGIN_PATH;
