@@ -2,7 +2,7 @@
   description = "Bitcoin development environment";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -16,12 +16,14 @@
         commonNativeBuildInputs = with pkgs; [
           byacc
           ccache
-          clang-tools_19
-          clang_19
           cmake
           gcc14
           gnum4
           gnumake
+          include-what-you-use
+          llvmPackages_20.clang
+          llvmPackages_20.clang-tools
+          llvmPackages_20.stdenv
           mold-wrapped
           ninja
           pkg-config
@@ -64,6 +66,9 @@
         ];
 
         linuxBuildInputs = with pkgs; [
+          libsystemtap
+          linuxPackages.bcc
+          linuxPackages.bpftrace
           python312Packages.bcc
         ];
 
@@ -73,12 +78,12 @@
           # Opinionated defaults
           export CC=clang
           export CXX=clang++
-          export CMAKE_GENERATOR=Ninja
-          export LDFLAGS="-fuse-ld=mold"
         '';
       in
       {
         devShells.default = pkgs.mkShell {
+          CMAKE_GENERATOR = "Ninja";
+          LDFLAGS = "-fuse-ld=mold";
           LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.gcc14.cc pkgs.capnproto ];
           LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
           QT_PLUGIN_PATH = "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}";
