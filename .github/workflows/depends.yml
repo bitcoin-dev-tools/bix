@@ -1,0 +1,50 @@
+name: Build from depends
+
+on:
+  - push
+  - pull_request
+  - workflow_dispatch
+
+jobs:
+  depends:
+    name: Depends build (x86_64-linux)
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Checkout Bitcoin Repo
+        uses: actions/checkout@v4
+        with:
+          repository: bitcoin/bitcoin
+          path: bitcoin
+          fetch-depth: 1
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          determinate: true
+          extra-conf: lazy-trees = true
+
+      - name: Set Up Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: nix-dev-shell
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Run `nix flake check`
+        run: nix flake check
+
+      - name: Build bitcoin from depends
+        run: |
+          nix develop --command bash -c "
+            cd bitcoin
+            make -C depends -j$(nproc)
+            cmake -B build --toolchain \"$PWD/depends/x86_64-pc-linux-gnu/toolchain.cmake\"
+            cmake --build build -j$(nproc)
+          "
