@@ -1,4 +1,4 @@
-name: Nix CI
+name: Build from nixpkgs
 
 on:
   - push
@@ -6,7 +6,7 @@ on:
 
 jobs:
   check:
-    name: Nix CI (${{ matrix.system }})
+    name: nixpkgs (${{ matrix.system }})
     runs-on: ${{ matrix.runner_label }}
 
     permissions:
