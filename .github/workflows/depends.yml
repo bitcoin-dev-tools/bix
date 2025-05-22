@@ -9,7 +9,7 @@ on:
 
 jobs:
   depends:
-    name: Depends build (x86_64-linux)
+    name: depends (x86_64-linux)
     runs-on: ubuntu-latest
 
     permissions:
