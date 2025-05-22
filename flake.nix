@@ -41,17 +41,20 @@
           byacc
           ccache
           cmake
+          curlMinimal
           gnum4
           gnumake
+          gnupatch
           libtool
           llvmPackages_20.clang
           llvmPackages_20.clang-tools
           ninja
           pkg-config
-          qt6.wrapQtAppsHook
+          python3
+          xz
         ]
         ++ lib.optionals isLinux [
-          mold-wrapped
+          # mold-wrapped
           libsystemtap
           linuxPackages.bcc
           linuxPackages.bpftrace
@@ -65,8 +68,6 @@
           db4
           libevent
           qrencode
-          qt6.qtbase
-          qt6.qttools
           sqlite.dev
           zeromq
         ]
@@ -84,7 +85,6 @@
         CMAKE_GENERATOR = "Ninja";
         LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgsWithLLVM.capnproto ];
         LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgsWithLLVM.glibcLocales}/lib/locale/locale-archive";
-        QT_PLUGIN_PATH = "${pkgsWithLLVM.qt6.qtbase}/${pkgsWithLLVM.qt6.qtbase.qtPluginPrefix}";
       };
     in {
       formatter = pkgsWithLLVM.alejandra;
@@ -104,7 +104,7 @@
           uv
         ];
 
-        inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE QT_PLUGIN_PATH;
+        inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
       };
     });
 }
