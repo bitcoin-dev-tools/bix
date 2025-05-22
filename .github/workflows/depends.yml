@@ -30,7 +30,7 @@ jobs:
       - name: Cache Depends Sources
         uses: actions/cache@v4
         with:
-          path: bitcoin/depends/sources
+          path: depends-sources
           key: depends-sources
           restore-keys: depends-sources
           enableCrossOsArchive: true
@@ -38,7 +38,7 @@ jobs:
       - name: Cache Depends Built Packages
         uses: actions/cache@v4
         with:
-          path: bitcoin/depends/base
+          path: depends-base
           key: depends-base-${{ runner.os }}-${{ hashFiles('bitcoin/depends/packages/*.mk') }}
           restore-keys: depends-base-${{ runner.os }}-
 
@@ -61,7 +61,7 @@ jobs:
         run: |
           nix develop --command bash -c "
             cd bitcoin
-            make -C depends -j$(nproc) SOURCES_PATH=./depends/sources BASE_CACHE=./depends/base
-            cmake -B build --toolchain \"./depends/x86_64-pc-linux-gnu/toolchain.cmake\"
+            make -C depends -j$(nproc) SOURCES_PATH=\"$PWD/depends-sources\" BASE_CACHE=\"$PWD/depends-base\"
+            cmake -B build --toolchain \"$PWD/bitcoin/depends/x86_64-pc-linux-gnu/toolchain.cmake\"
             cmake --build build -j$(nproc)
           "
