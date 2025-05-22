@@ -61,7 +61,7 @@ jobs:
         run: |
           nix develop --command bash -c "
             cd bitcoin
-            make -C depends -j$(nproc) SOURCES_PATH=$PWD/depends/sources BASE_CACHE=$PWD/depends/base
-            cmake -B build --toolchain \"$PWD/depends/x86_64-pc-linux-gnu/toolchain.cmake\"
+            make -C depends -j$(nproc) SOURCES_PATH=./depends/sources BASE_CACHE=./depends/base
+            cmake -B build --toolchain \"./depends/x86_64-pc-linux-gnu/toolchain.cmake\"
             cmake --build build -j$(nproc)
           "
