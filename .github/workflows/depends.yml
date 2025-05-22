@@ -27,6 +27,14 @@ jobs:
           path: bitcoin
           fetch-depth: 1
 
+      - name: Cache Depends Sources
+        uses: actions/cache@v4
+        with:
+          path: bitcoin/depends/sources
+          key: depends-sources
+          restore-keys: depends-sources
+          enableCrossOsArchive: true
+
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
         with:
@@ -46,7 +54,7 @@ jobs:
         run: |
           nix develop --command bash -c "
             cd bitcoin
-            make -C depends -j$(nproc)
+            make -C depends -j$(nproc) SOURCES_PATH=$PWD/depends/sources
             cmake -B build --toolchain \"$PWD/depends/x86_64-pc-linux-gnu/toolchain.cmake\"
             cmake --build build -j$(nproc)
           "
