@@ -1,0 +1,59 @@
+name: Nix CI
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  check:
+    name: Nix CI (${{ matrix.system }})
+    runs-on: ${{ matrix.runner_label }}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner_label: ubuntu-latest
+          - system: x86_64-darwin
+            runner_label: macos-13
+          - system: aarch64-darwin
+            runner_label: macos-14
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Checkout Bitcoin Repo
+        uses: actions/checkout@v4
+        with:
+          repository: bitcoin/bitcoin
+          path: bitcoin
+          fetch-depth: 1
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          determinate: true
+          extra-conf: lazy-trees = true
+
+      - name: Set Up Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: nix-dev-shell
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Run `nix flake check`
+        run: nix flake check
+
+      - name: Build bitcoind
+        run: |
+          nix develop --command bash -c "
+            cd bitcoin
+            cmake -B build
+            cmake --build build -j$(nproc)
+          "
