@@ -22,6 +22,8 @@ jobs:
         include:
           - system: x86_64-linux
             runner_label: ubuntu-latest
+          - system: aarch64-linux
+            runner_label: ubuntu-24.04-arm
           - system: x86_64-darwin
             runner_label: macos-13
           - system: aarch64-darwin
