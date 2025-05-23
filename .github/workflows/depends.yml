@@ -23,7 +23,8 @@ jobs:
       - name: Checkout Bitcoin Repo
         uses: actions/checkout@v4
         with:
-          repository: bitcoin/bitcoin
+          repository: willcl-ark/bitcoin
+          ref: cmake-dependency-provider
           path: bitcoin
           fetch-depth: 1
 
