@@ -105,6 +105,9 @@
           ]
           ++ platformPkgs isLinux [gdb]
           ++ platformPkgs isDarwin [llvmTools.lldb];
+        shellHook = ''
+          unset SOURCE_DATE_EPOCH
+        '';
 
         inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
       };
