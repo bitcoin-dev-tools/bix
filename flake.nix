@@ -13,57 +13,32 @@
   }:
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {inherit system;};
-      isLinux = pkgs.stdenv.isLinux;
-      isDarwin = pkgs.stdenv.isDarwin;
       lib = pkgs.lib;
       llvmVersion = "20";
-      llvmPackages = lib.getAttr "llvmPackages_${llvmVersion}" pkgs;
+      llvmPackages = pkgs."llvmPackages_${llvmVersion}";
+      isLinux = pkgs.stdenv.isLinux;
+      isDarwin = pkgs.stdenv.isDarwin;
 
-      # Create a full LLVM toolchain with clang and lld
       llvmTools = {
-        stdenv = llvmPackages.stdenv.override {
-          cc = llvmPackages.clang.override {
-            bintools = llvmPackages.bintools;
-          };
-        };
-        clang = llvmPackages.clang;
-        clang-tools = llvmPackages.clang-tools;
-        lldb = lib.getAttr "lldb_${llvmVersion}" pkgs;
+        inherit (llvmPackages) bintools clang clang-tools;
+        lldb = pkgs."lldb_${llvmVersion}";
       };
 
-      # Override pkgs with the LLVM toolchain
-      pkgsWithLLVM = import nixpkgs {
-        inherit system;
-        stdenv = llvmTools.stdenv;
-      };
-
-      # Helper fn for platform-specific packages
-      platformPkgs = cond: pkgs:
-        if cond
-        then pkgs
-        else [];
-
-      nativeBuildInputs = with pkgsWithLLVM;
-        [
+      commonPkgs = with pkgs; {
+        nativeBuildInputs = [
           bison
           ccache
           cmake
           curlMinimal
+          llvmTools.bintools
           llvmTools.clang
           llvmTools.clang-tools
           ninja
           pkg-config
           python3
           xz
-        ]
-        ++ platformPkgs isLinux [
-          libsystemtap
-          linuxPackages.bcc
-          linuxPackages.bpftrace
         ];
-
-      buildInputs = with pkgsWithLLVM;
-        [
+        buildInputs = [
           boost
           capnproto
           db4
@@ -71,44 +46,62 @@
           qrencode
           sqlite.dev
           zeromq
-        ]
-        ++ platformPkgs isLinux [
+        ];
+        devTools = [
+          codespell
+          hexdump
+          python312
+          python312Packages.flake8
+          python312Packages.lief
+          python312Packages.mypy
+          python312Packages.pyzmq
+          python312Packages.vulture
+        ];
+      };
+
+      linuxPkgs = with pkgs; {
+        nativeBuildInputs = [
+          libsystemtap
+        ];
+        buildInputs = [
           libsystemtap
           linuxPackages.bcc
           linuxPackages.bpftrace
           python312Packages.bcc
         ];
+        devTools = [gdb];
+      };
+
+      darwinPkgs = {
+        devTools = [llvmTools.lldb];
+      };
+
+      mergePkgs = key:
+        lib.flatten [
+          commonPkgs.${key}
+          (lib.optionals isLinux linuxPkgs.${key})
+          (lib.optionals isDarwin darwinPkgs.${key})
+        ];
+
+      finalPkgs = {
+        nativeBuildInputs = mergePkgs "nativeBuildInputs";
+        buildInputs = mergePkgs "buildInputs";
+        packages = mergePkgs "devTools";
+      };
 
       env = {
         CMAKE_GENERATOR = "Ninja";
-        LD_LIBRARY_PATH = lib.makeLibraryPath [pkgsWithLLVM.capnproto];
+        LD_LIBRARY_PATH = lib.makeLibraryPath [pkgs.capnproto];
         LDFLAGS = "-fuse-ld=lld";
-        LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgsWithLLVM.glibcLocales}/lib/locale/locale-archive";
+        LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
       };
     in {
-      devShells.default = (pkgsWithLLVM.mkShell.override {stdenv = llvmTools.stdenv;}) {
-        nativeBuildInputs = nativeBuildInputs;
-        buildInputs = buildInputs;
-        packages = with pkgsWithLLVM;
-          [
-            codespell
-            hexdump
-            python312
-            python312Packages.flake8
-            python312Packages.lief
-            python312Packages.mypy
-            python312Packages.pyzmq
-            python312Packages.vulture
-          ]
-          ++ platformPkgs isLinux [gdb]
-          ++ platformPkgs isDarwin [llvmTools.lldb];
-        shellHook = ''
-          unset SOURCE_DATE_EPOCH
-        '';
-
+      devShells.default = pkgs.mkShellNoCC {
+        inherit (finalPkgs) nativeBuildInputs buildInputs packages;
         inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LDFLAGS LOCALE_ARCHIVE;
+        shellHook = "unset SOURCE_DATE_EPOCH";
       };
 
-      formatter = pkgsWithLLVM.alejandra;
+      formatter = pkgs.alejandra;
     });
 }
