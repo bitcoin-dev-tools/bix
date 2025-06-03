@@ -19,27 +19,30 @@
       llvmVersion = "20";
       llvmPackages = lib.getAttr "llvmPackages_${llvmVersion}" pkgs;
 
-      # LLVM tools
+      # Create a full LLVM toolchain with clang and lld
       llvmTools = {
-        stdenv = llvmPackages.stdenv.override {cc = llvmPackages.clangUseLLVM;};
+        stdenv = llvmPackages.stdenv.override {
+          cc = llvmPackages.clang.override {
+            bintools = llvmPackages.bintools;
+          };
+        };
         clang = llvmPackages.clang;
         clang-tools = llvmPackages.clang-tools;
         lldb = lib.getAttr "lldb_${llvmVersion}" pkgs;
       };
 
-      # Override pkgs with custom toolchain
+      # Override pkgs with the LLVM toolchain
       pkgsWithLLVM = import nixpkgs {
         inherit system;
         stdenv = llvmTools.stdenv;
       };
 
-      # Helper for platform-specific packages
+      # Helper fn for platform-specific packages
       platformPkgs = cond: pkgs:
         if cond
         then pkgs
         else [];
 
-      # Dependencies
       nativeBuildInputs = with pkgsWithLLVM;
         [
           bison
@@ -79,6 +82,7 @@
       env = {
         CMAKE_GENERATOR = "Ninja";
         LD_LIBRARY_PATH = lib.makeLibraryPath [pkgsWithLLVM.capnproto];
+        LDFLAGS = "-fuse-ld=lld";
         LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgsWithLLVM.glibcLocales}/lib/locale/locale-archive";
       };
     in {
@@ -102,7 +106,7 @@
           unset SOURCE_DATE_EPOCH
         '';
 
-        inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
+        inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LDFLAGS LOCALE_ARCHIVE;
       };
 
       formatter = pkgsWithLLVM.alejandra;
