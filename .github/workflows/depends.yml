@@ -17,6 +17,8 @@ jobs:
 
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
+      SOURCES_PATH: ${{ github.workspace }}/depends-sources
+      BASE_CACHE: ${{ github.workspace }}/depends-base
 
     steps:
       - name: Checkout Repo
@@ -33,7 +35,7 @@ jobs:
       - name: Cache Depends Sources
         uses: actions/cache@v4
         with:
-          path: depends-sources
+          path: ${{ env.SOURCES_PATH }}
           key: depends-sources
           restore-keys: depends-sources
           enableCrossOsArchive: true
@@ -41,7 +43,7 @@ jobs:
       - name: Cache Depends Built Packages
         uses: actions/cache@v4
         with:
-          path: depends-base
+          path: ${{ env.BASE_CACHE }}
           key: depends-base-${{ runner.os }}-${{ hashFiles('bitcoin/depends/packages/*.mk') }}
           restore-keys: depends-base-${{ runner.os }}-
 
@@ -81,10 +83,17 @@ jobs:
       - name: Build bitcoin from depends
         run: |
           nix develop --command bash -c "
+            set -eux
+
             export CCACHE_DIR=${{ env.CCACHE_DIR }}
+            export SOURCES_PATH=${{ env.SOURCES_PATH }}
+            export BASE_CACHE=${{ env.BASE_CACHE }}
+
             cd bitcoin
-            make -C depends -j$(nproc) SOURCES_PATH=\"$PWD/depends-sources\" BASE_CACHE=\"$PWD/depends-base\"
-            cmake -B build --toolchain \"$PWD/bitcoin/depends/x86_64-pc-linux-gnu/toolchain.cmake\" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-            cmake --build build -j$(nproc)
+            HOST_TRIPLET=\$(./depends/config.guess)
+            export HOST_TRIPLET
+            make -C depends -j\$(nproc)
+            cmake -B build --toolchain \"depends/\$HOST_TRIPLET/toolchain.cmake\" -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=\"depends/\$HOST_TRIPLET/dependency_provider.cmake\"
+            cmake --build build -j\$(nproc)
             ccache --show-stats
           "
