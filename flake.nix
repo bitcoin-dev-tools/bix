@@ -1,5 +1,5 @@
 {
-  description = "Bitcoin development environment with tools for building, testing, and debugging";
+  description = "Bitcoin development environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -27,16 +27,10 @@
         lldb = lib.getAttr "lldb_${llvmVersion}" pkgs;
       };
 
-      # Toolchain with mold for Linux
-      toolchain =
-        if isLinux
-        then pkgs.stdenvAdapters.useMoldLinker llvmTools.stdenv
-        else llvmTools.stdenv;
-
       # Override pkgs with custom toolchain
       pkgsWithLLVM = import nixpkgs {
         inherit system;
-        stdenv = toolchain;
+        stdenv = llvmTools.stdenv;
       };
 
       # Helper for platform-specific packages
@@ -60,7 +54,6 @@
           xz
         ]
         ++ platformPkgs isLinux [
-          mold-wrapped
           libsystemtap
           linuxPackages.bcc
           linuxPackages.bpftrace
@@ -89,7 +82,7 @@
         LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgsWithLLVM.glibcLocales}/lib/locale/locale-archive";
       };
     in {
-      devShells.default = (pkgsWithLLVM.mkShell.override {stdenv = toolchain;}) {
+      devShells.default = (pkgsWithLLVM.mkShell.override {stdenv = llvmTools.stdenv;}) {
         nativeBuildInputs = nativeBuildInputs;
         buildInputs = buildInputs;
         packages = with pkgsWithLLVM;
