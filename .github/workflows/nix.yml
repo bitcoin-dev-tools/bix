@@ -78,6 +78,7 @@ jobs:
       - name: Build bitcoind
         run: |
           nix develop --command bash -c "
+            set -eux
             export CCACHE_DIR=${{ env.CCACHE_DIR }}
             cd bitcoin
             cmake -B build -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
