@@ -67,6 +67,7 @@
           linuxPackages.bpftrace
         ];
 
+      # Will exist in the runtime environment
       buildInputs = with pkgs;
         [
           boost
@@ -88,6 +89,7 @@
         LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
       };
     in {
+      # We use mkShelNoCC to avoid having Nix set up a gcc-based build environment
       devShells.default = pkgs.mkShellNoCC {
         inherit nativeBuildInputs buildInputs;
         packages =
@@ -100,6 +102,7 @@
           ++ platformPkgs isDarwin [llvmTools.lldb];
 
         shellHook = ''
+          # This can likely be removed if https://github.com/bitcoin/bitcoin/pull/32678 is merged
           unset SOURCE_DATE_EPOCH
         '';
         inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
