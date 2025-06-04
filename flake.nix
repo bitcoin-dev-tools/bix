@@ -16,7 +16,11 @@
       isLinux = pkgs.stdenv.isLinux;
       isDarwin = pkgs.stdenv.isDarwin;
       lib = pkgs.lib;
+
+      # Configure LLVM and python version for the environment
       llvmVersion = "20";
+      pythonVersion = "13";
+
       llvmPackages = pkgs."llvmPackages_${llvmVersion}";
       llvmTools = {
         inherit (llvmPackages) bintools clang clang-tools;
@@ -29,7 +33,21 @@
         then pkgs
         else [];
 
-      # Dependencies
+      # Use a single pythonEnv throughout and specifically in the devShell to make sure bcc is available.
+      pythonEnv = pkgs."python3${pythonVersion}".withPackages (ps:
+        with ps;
+          [
+            flake8
+            lief
+            mypy
+            pyzmq
+            vulture
+          ]
+          ++ platformPkgs isLinux [
+            bcc
+          ]);
+
+      # Will only exist in the build environment
       nativeBuildInputs = with pkgs;
         [
           bison
@@ -41,7 +59,6 @@
           llvmTools.clang-tools
           ninja
           pkg-config
-          python3
           xz
         ]
         ++ platformPkgs isLinux [
@@ -63,7 +80,6 @@
           libsystemtap
           linuxPackages.bcc
           linuxPackages.bpftrace
-          python312Packages.bcc
         ];
 
       env = {
@@ -72,26 +88,20 @@
         LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
       };
     in {
-      devShells.default = (pkgs.mkShellNoCC) {
-        nativeBuildInputs = nativeBuildInputs;
-        buildInputs = buildInputs;
-        packages = with pkgs;
+      devShells.default = pkgs.mkShellNoCC {
+        inherit nativeBuildInputs buildInputs;
+        packages =
           [
-            codespell
-            hexdump
-            python312
-            python312Packages.flake8
-            python312Packages.lief
-            python312Packages.mypy
-            python312Packages.pyzmq
-            python312Packages.vulture
+            pythonEnv
+            pkgs.codespell
+            pkgs.hexdump
           ]
-          ++ platformPkgs isLinux [gdb]
+          ++ platformPkgs isLinux [pkgs.gdb]
           ++ platformPkgs isDarwin [llvmTools.lldb];
+
         shellHook = ''
           unset SOURCE_DATE_EPOCH
         '';
-
         inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
       };
 
