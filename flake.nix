@@ -99,12 +99,10 @@
           ]
           ++ platformPkgs isLinux [gdb]
           ++ platformPkgs isDarwin [llvmTools.lldb];
-        shellHook = ''
-          unset SOURCE_DATE_EPOCH
-        '';
         CMAKE_GENERATOR = "Ninja";
         LD_LIBRARY_PATH = lib.makeLibraryPath [pkgsWithLLVM.capnproto];
         LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgsWithLLVM.glibcLocales}/lib/locale/locale-archive";
+        SOURCE_DATE_EPOCH = null;
       };
 
       formatter = pkgsWithLLVM.alejandra;
