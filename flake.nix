@@ -17,20 +17,10 @@
       isDarwin = pkgs.stdenv.isDarwin;
       lib = pkgs.lib;
       llvmVersion = "20";
-      llvmPackages = lib.getAttr "llvmPackages_${llvmVersion}" pkgs;
-
-      # LLVM tools
+      llvmPackages = pkgs."llvmPackages_${llvmVersion}";
       llvmTools = {
-        stdenv = llvmPackages.stdenv.override {cc = llvmPackages.clangUseLLVM;};
-        clang = llvmPackages.clang;
-        clang-tools = llvmPackages.clang-tools;
-        lldb = lib.getAttr "lldb_${llvmVersion}" pkgs;
-      };
-
-      # Override pkgs with custom toolchain
-      pkgsWithLLVM = import nixpkgs {
-        inherit system;
-        stdenv = llvmTools.stdenv;
+        inherit (llvmPackages) bintools clang clang-tools;
+        lldb = pkgs."lldb_${llvmVersion}";
       };
 
       # Helper for platform-specific packages
@@ -40,12 +30,13 @@
         else [];
 
       # Dependencies
-      nativeBuildInputs = with pkgsWithLLVM;
+      nativeBuildInputs = with pkgs;
         [
           bison
           ccache
           cmake
           curlMinimal
+          llvmTools.bintools
           llvmTools.clang
           llvmTools.clang-tools
           ninja
@@ -59,7 +50,7 @@
           linuxPackages.bpftrace
         ];
 
-      buildInputs = with pkgsWithLLVM;
+      buildInputs = with pkgs;
         [
           boost
           capnproto
@@ -78,14 +69,14 @@
 
       env = {
         CMAKE_GENERATOR = "Ninja";
-        LD_LIBRARY_PATH = lib.makeLibraryPath [pkgsWithLLVM.capnproto];
-        LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgsWithLLVM.glibcLocales}/lib/locale/locale-archive";
+        LD_LIBRARY_PATH = lib.makeLibraryPath [pkgs.capnproto];
+        LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
       };
     in {
-      devShells.default = (pkgsWithLLVM.mkShell.override {stdenv = llvmTools.stdenv;}) {
+      devShells.default = (pkgs.mkShellNoCC) {
         nativeBuildInputs = nativeBuildInputs;
         buildInputs = buildInputs;
-        packages = with pkgsWithLLVM;
+        packages = with pkgs;
           [
             codespell
             hexdump
@@ -105,6 +96,6 @@
         inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
       };
 
-      formatter = pkgsWithLLVM.alejandra;
+      formatter = pkgs.alejandra;
     });
 }
