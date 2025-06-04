@@ -82,12 +82,6 @@
           linuxPackages.bpftrace
           python312Packages.bcc
         ];
-
-      env = {
-        CMAKE_GENERATOR = "Ninja";
-        LD_LIBRARY_PATH = lib.makeLibraryPath [pkgsWithLLVM.capnproto];
-        LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgsWithLLVM.glibcLocales}/lib/locale/locale-archive";
-      };
     in {
       devShells.default = (pkgsWithLLVM.mkShell.override {stdenv = toolchain;}) {
         nativeBuildInputs = nativeBuildInputs;
@@ -108,8 +102,9 @@
         shellHook = ''
           unset SOURCE_DATE_EPOCH
         '';
-
-        inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
+        CMAKE_GENERATOR = "Ninja";
+        LD_LIBRARY_PATH = lib.makeLibraryPath [pkgsWithLLVM.capnproto];
+        LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgsWithLLVM.glibcLocales}/lib/locale/locale-archive";
       };
 
       formatter = pkgsWithLLVM.alejandra;
