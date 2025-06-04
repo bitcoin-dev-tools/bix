@@ -92,7 +92,7 @@ jobs:
             cd bitcoin
             HOST_TRIPLET=\$(./depends/config.guess)
             export HOST_TRIPLET
-            make -C depends -j\$(nproc)
+            make -C depends -j\$(nproc) NO_QT=1
             cmake -B build --toolchain \"depends/\$HOST_TRIPLET/toolchain.cmake\" -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=\"depends/\$HOST_TRIPLET/dependency_provider.cmake\"
             cmake --build build -j\$(nproc)
             ccache --show-stats
