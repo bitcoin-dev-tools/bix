@@ -63,7 +63,6 @@
         [
           boost
           capnproto
-          db4
           libevent
           qrencode
           sqlite.dev

@@ -22,7 +22,6 @@ We use a slightly opinionated Clang/LLVM-based build system:
 
 All Bitcoin Core dependencies from nixpkgs:
 - Boost
-- Berkeley DB 4.x (legacy only now)
 - libevent
 - SQLite
 - ZeroMQ
