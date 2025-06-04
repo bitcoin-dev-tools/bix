@@ -82,7 +82,7 @@
         LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgsWithLLVM.glibcLocales}/lib/locale/locale-archive";
       };
     in {
-      devShells.default = (pkgsWithLLVM.mkShell.override {stdenv = llvmTools.stdenv;}) {
+      devShells.default = (pkgs.mkShellNoCC) {
         nativeBuildInputs = nativeBuildInputs;
         buildInputs = buildInputs;
         packages = with pkgsWithLLVM;
