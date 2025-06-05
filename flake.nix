@@ -59,6 +59,7 @@
           llvmTools.clang-tools
           ninja
           pkg-config
+          qt6.wrapQtAppsHook # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
           xz
         ]
         ++ platformPkgs isLinux [
@@ -74,6 +75,8 @@
           capnproto
           libevent
           qrencode
+          qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
+          qt6.qttools
           sqlite.dev
           zeromq
         ]
