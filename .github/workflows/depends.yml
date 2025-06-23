@@ -32,38 +32,36 @@ jobs:
           path: bitcoin
           fetch-depth: 1
 
+      - name: Set cache paths
+        shell: bash
+        run: |
+          echo "CCACHE_DIR=${{ runner.temp }}/ccache_dir" >> $GITHUB_ENV
+          echo "DEPENDS_DIR=${{ runner.temp }}/depends" >> $GITHUB_ENV
+          echo "SOURCES_PATH=${{ runner.temp }}/depends/sources" >> $GITHUB_ENV
+          echo "BASE_CACHE=${{ runner.temp }}/depends/built" >> $GITHUB_ENV
+          echo "DEPENDS_HASH=${{ hashFiles('depends/packages/*.mk', 'depends/Makefile', 'depends/config.guess', 'depends/config.sub', 'depends/funcs.mk', 'depends/builders/*.mk', 'depends/hosts/*.mk') }}" >> $GITHUB_ENV
+
       - name: Cache Depends Sources
         uses: actions/cache@v4
         with:
           path: ${{ env.SOURCES_PATH }}
-          key: depends-sources
-          restore-keys: depends-sources
-          enableCrossOsArchive: true
+          key: depends-sources-${{ env.DEPENDS_HASH }}
+          restore-keys: depends-sources-
 
       - name: Cache Depends Built Packages
         uses: actions/cache@v4
         with:
           path: ${{ env.BASE_CACHE }}
-          key: depends-base-${{ runner.os }}-${{ hashFiles('bitcoin/depends/packages/*.mk') }}
-          restore-keys: depends-base-${{ runner.os }}-
-
-      - name: Set up ccache key
-        id: ccache_key
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "key=depends-ccache-pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "key=depends-ccache-master" >> "$GITHUB_OUTPUT"
-          fi
+          key: depends-built-${{ github.job }}-${{ env.DEPENDS_HASH }}-${{ github.run_id }}
+          restore-keys: depends-built-${{ github.job }}-${{ env.DEPENDS_HASH }}-
 
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ${{ steps.ccache_key.outputs.key }}
+          key: ccache-${{ github.job }}-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
-            depends-ccache-master-
-            depends-ccache-
+            ccache-${{ github.job }}-
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
