@@ -55,6 +55,20 @@
           linuxPackages.bpftrace
         ];
 
+      # Alias gcc/g++ to clang/clang++
+      clangShim = pkgs.stdenv.mkDerivation {
+        name = "clang-shim";
+        buildInputs = [llvmTools.clang];
+        phases = ["installPhase"];
+        installPhase = ''
+          mkdir -p $out/bin
+          ln -s ${llvmTools.clang}/bin/clang $out/bin/gcc
+          ln -s ${llvmTools.clang}/bin/clang++ $out/bin/g++
+          ln -s ${llvmTools.clang}/bin/clang $out/bin/clang
+          ln -s ${llvmTools.clang}/bin/clang++ $out/bin/clang++
+        '';
+      };
+
       # Will only exist in the build environment and includes everything needed
       # for a depends build
       dependsNativeBuildInputs = with pkgs;
@@ -64,8 +78,8 @@
           cmake
           curlMinimal
           llvmTools.bintools
-          llvmTools.clang
           llvmTools.clang-tools
+          clangShim
           ninja
           pkg-config
           xz
@@ -112,9 +126,6 @@
 
           inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
         };
-        # TODO: this could be ported to a gcc shell in the future to bring this closer in line
-        # with our guix depends build. This would allow us to remove the shellHook hack that shims
-        # in clang to masquerade as gcc
         depends = pkgs.mkShellNoCC {
           nativeBuildInputs = dependsNativeBuildInputs;
           buildInputs = usdtPkgs;
@@ -123,19 +134,7 @@
             # build system, so we unset this in the depends devshell
             unset SOURCE_DATE_EPOCH
 
-            # its not super easy to override compiler defaults in
-            # depends, so as a hack we just shim in clang and pretend
-            # its gcc. this is done in a tmp dir to avoid polluting the
-            # users shell and is cleaned up when the shell is exited.
-            TMP_GCC_SHIM=$(mktemp -d "$TMPDIR/clang-shim.XXXXXX")
-
-            ln -sf $(command -v clang++) "$TMP_GCC_SHIM/g++"
-            ln -sf $(command -v clang) "$TMP_GCC_SHIM/gcc"
-
-            export PATH="$TMP_GCC_SHIM:$PATH"
-            echo "Using fake gcc/g++ -> clang in: $TMP_GCC_SHIM"
-
-            trap "rm -rf $TMP_GCC_SHIM" EXIT
+            echo "gcc/g++ are shimmed to llvm tools"
           '';
           inherit (env) CMAKE_GENERATOR LOCALE_ARCHIVE;
         };
