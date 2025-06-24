@@ -47,28 +47,54 @@
             bcc
           ]);
 
-      # Will only exist in the build environment
-      nativeBuildInputs = with pkgs;
-        [
-          bison
-          ccache
-          cmake
-          curlMinimal
-          llvmTools.bintools
-          llvmTools.clang
-          llvmTools.clang-tools
-          ninja
-          pkg-config
-          qt6.wrapQtAppsHook # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
-          xz
-        ]
-        ++ platformPkgs isLinux [
+      # USDT is only supported on linux
+      usdtPkgs = with pkgs;
+        platformPkgs isLinux [
           libsystemtap
           linuxPackages.bcc
           linuxPackages.bpftrace
         ];
+      # Alias gcc/g++ to clang/clang++
+      # this is a workaround to be able to build multiprocess via depends.
+      # As of today, depends uses a hardcoded gcc/g++ and will fail if they
+      # are not found in the environment. we can remove this if/when depends
+      # is updated to allow overriding the compiler from the environment
+      clangShim = pkgs.stdenv.mkDerivation {
+        name = "clang-shim";
+        buildInputs = [llvmTools.clang];
+        phases = ["installPhase"];
+        installPhase = ''
+          mkdir -p $out/bin
+          ln -s ${llvmTools.clang}/bin/clang $out/bin/gcc
+          ln -s ${llvmTools.clang}/bin/clang++ $out/bin/g++
+          ln -s ${llvmTools.clang}/bin/clang $out/bin/clang
+          ln -s ${llvmTools.clang}/bin/clang++ $out/bin/clang++
+        '';
+      };
 
-      # Will exist in the runtime environment
+      # Will only exist in the build environment and includes everything needed
+      # for a depends build
+      dependsNativeBuildInputs = with pkgs; [
+        bison
+        ccache
+        cmake
+        curlMinimal
+        llvmTools.bintools
+        llvmTools.clang
+        llvmTools.clang-tools
+        clangShim
+        ninja
+        pkg-config
+        xz
+      ];
+      nativeBuildInputs = with pkgs;
+        dependsNativeBuildInputs
+        ++ [
+          qt6.wrapQtAppsHook # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
+        ]
+        ++ usdtPkgs;
+
+      # Will exist in the runtime environment - not needed for a depends build
       buildInputs = with pkgs;
         [
           boost
@@ -80,11 +106,7 @@
           sqlite.dev
           zeromq
         ]
-        ++ platformPkgs isLinux [
-          libsystemtap
-          linuxPackages.bcc
-          linuxPackages.bpftrace
-        ];
+        ++ usdtPkgs;
 
       env = {
         CMAKE_GENERATOR = "Ninja";
@@ -93,17 +115,25 @@
       };
     in {
       # We use mkShelNoCC to avoid having Nix set up a gcc-based build environment
-      devShells.default = pkgs.mkShellNoCC {
-        inherit nativeBuildInputs buildInputs;
-        packages =
-          [
-            pythonEnv
-            pkgs.codespell
-            pkgs.hexdump
-          ]
-          ++ platformPkgs isLinux [pkgs.gdb]
-          ++ platformPkgs isDarwin [llvmTools.lldb];
-        inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
+      devShells = {
+        default = pkgs.mkShellNoCC {
+          inherit nativeBuildInputs buildInputs;
+          packages =
+            [
+              pythonEnv
+              pkgs.codespell
+              pkgs.hexdump
+            ]
+            ++ platformPkgs isLinux [pkgs.gdb]
+            ++ platformPkgs isDarwin [llvmTools.lldb];
+
+          inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
+        };
+        depends = pkgs.mkShellNoCC {
+          nativeBuildInputs = dependsNativeBuildInputs;
+          buildInputs = usdtPkgs;
+          inherit (env) CMAKE_GENERATOR LOCALE_ARCHIVE;
+        };
       };
 
       formatter = pkgs.alejandra;
