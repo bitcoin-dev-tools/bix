@@ -55,20 +55,6 @@
           linuxPackages.bpftrace
         ];
 
-      # Alias gcc/g++ to clang/clang++
-      clangShim = pkgs.stdenv.mkDerivation {
-        name = "clang-shim";
-        buildInputs = [llvmTools.clang];
-        phases = ["installPhase"];
-        installPhase = ''
-          mkdir -p $out/bin
-          ln -s ${llvmTools.clang}/bin/clang $out/bin/gcc
-          ln -s ${llvmTools.clang}/bin/clang++ $out/bin/g++
-          ln -s ${llvmTools.clang}/bin/clang $out/bin/clang
-          ln -s ${llvmTools.clang}/bin/clang++ $out/bin/clang++
-        '';
-      };
-
       # Will only exist in the build environment and includes everything needed
       # for a depends build
       dependsNativeBuildInputs = with pkgs;
@@ -79,7 +65,7 @@
           curlMinimal
           llvmTools.bintools
           llvmTools.clang-tools
-          clangShim
+          llvmTools.clang
           ninja
           pkg-config
           xz
@@ -133,8 +119,6 @@
             # having SOURCE_DATE_EPOCH set can interfere with the guix
             # build system, so we unset this in the depends devshell
             unset SOURCE_DATE_EPOCH
-
-            echo "gcc/g++ are shimmed to llvm tools"
           '';
           inherit (env) CMAKE_GENERATOR LOCALE_ARCHIVE;
         };

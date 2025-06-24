@@ -90,7 +90,7 @@ jobs:
             cd bitcoin
             HOST_TRIPLET=\$(./depends/config.guess)
             export HOST_TRIPLET
-            make -C depends -j4
+            make -C depends -j4 default_host_CC=clang default_host_CXX=clang++
             cmake -B build --toolchain \"depends/\$HOST_TRIPLET/toolchain.cmake\"
             cmake --build build -j4
             ccache --show-stats
