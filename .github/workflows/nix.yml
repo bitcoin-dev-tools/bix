@@ -86,6 +86,6 @@ jobs:
             export CCACHE_DIR=${{ env.CCACHE_DIR }}
             cd bitcoin
             cmake -B build -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache --preset dev-mode ${{ matrix.cmake_flags }}
-            cmake --build build -j$(nproc)
+            cmake --build build -j4
             ccache --show-stats
           "

@@ -47,28 +47,37 @@
             bcc
           ]);
 
-      # Will only exist in the build environment
-      nativeBuildInputs = with pkgs;
+      # USDT is only supported on linux
+      usdtPkgs = with pkgs;
+        platformPkgs isLinux [
+          libsystemtap
+          linuxPackages.bcc
+          linuxPackages.bpftrace
+        ];
+
+      # Will only exist in the build environment and includes everything needed
+      # for a depends build
+      dependsNativeBuildInputs = with pkgs;
         [
           bison
           ccache
           cmake
           curlMinimal
           llvmTools.bintools
-          llvmTools.clang
           llvmTools.clang-tools
+          llvmTools.clang
           ninja
           pkg-config
-          qt6.wrapQtAppsHook # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
           xz
         ]
-        ++ platformPkgs isLinux [
-          libsystemtap
-          linuxPackages.bcc
-          linuxPackages.bpftrace
+        ++ usdtPkgs;
+      nativeBuildInputs = with pkgs;
+        dependsNativeBuildInputs
+        ++ [
+          qt6.wrapQtAppsHook # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
         ];
 
-      # Will exist in the runtime environment
+      # Will exist in the runtime environment - not needed for a depends build
       buildInputs = with pkgs;
         [
           boost
@@ -80,11 +89,7 @@
           sqlite.dev
           zeromq
         ]
-        ++ platformPkgs isLinux [
-          libsystemtap
-          linuxPackages.bcc
-          linuxPackages.bpftrace
-        ];
+        ++ usdtPkgs;
 
       env = {
         CMAKE_GENERATOR = "Ninja";
@@ -93,22 +98,30 @@
       };
     in {
       # We use mkShelNoCC to avoid having Nix set up a gcc-based build environment
-      devShells.default = pkgs.mkShellNoCC {
-        inherit nativeBuildInputs buildInputs;
-        packages =
-          [
-            pythonEnv
-            pkgs.codespell
-            pkgs.hexdump
-          ]
-          ++ platformPkgs isLinux [pkgs.gdb]
-          ++ platformPkgs isDarwin [llvmTools.lldb];
+      devShells = {
+        default = pkgs.mkShellNoCC {
+          inherit nativeBuildInputs buildInputs;
+          packages =
+            [
+              pythonEnv
+              pkgs.codespell
+              pkgs.hexdump
+            ]
+            ++ platformPkgs isLinux [pkgs.gdb]
+            ++ platformPkgs isDarwin [llvmTools.lldb];
 
-        shellHook = ''
-          # This can likely be removed if https://github.com/bitcoin/bitcoin/pull/32678 is merged
-          unset SOURCE_DATE_EPOCH
-        '';
-        inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
+          inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
+        };
+        depends = pkgs.mkShellNoCC {
+          nativeBuildInputs = dependsNativeBuildInputs;
+          buildInputs = usdtPkgs;
+          shellHook = ''
+            # having SOURCE_DATE_EPOCH set can interfere with the guix
+            # build system, so we unset this in the depends devshell
+            unset SOURCE_DATE_EPOCH
+          '';
+          inherit (env) CMAKE_GENERATOR LOCALE_ARCHIVE;
+        };
       };
 
       formatter = pkgs.alejandra;
