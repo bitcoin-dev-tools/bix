@@ -103,11 +103,6 @@
           ]
           ++ platformPkgs isLinux [pkgs.gdb]
           ++ platformPkgs isDarwin [llvmTools.lldb];
-
-        shellHook = ''
-          # This can likely be removed if https://github.com/bitcoin/bitcoin/pull/32678 is merged
-          unset SOURCE_DATE_EPOCH
-        '';
         inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
       };
 
