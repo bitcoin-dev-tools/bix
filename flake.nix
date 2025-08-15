@@ -2,40 +2,56 @@
   description = "Bitcoin development environment with tools for building, testing, and debugging";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-qt6.url = "github:NixOS/nixpkgs/0c0e48b0ec1af2d7f7de70f839de1569927fe4c8";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = {
-    nixpkgs,
-    flake-utils,
-    ...
-  }:
-    flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = import nixpkgs {inherit system;};
-      isLinux = pkgs.stdenv.isLinux;
-      isDarwin = pkgs.stdenv.isDarwin;
-      lib = pkgs.lib;
+  outputs =
+    {
+      nixpkgs,
+      nixpkgs-qt6,
+      flake-utils,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        # Overlay depends-matching version of qt6:
+        # https://github.com/bitcoin/bitcoin/blob/master/depends/packages/qt_details.mk#L1
+        qtPkgs = import nixpkgs-qt6 { inherit system; };
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [
+            (final: prev: {
+              qt6 = qtPkgs.qt6;
+            })
+          ];
+        };
+        inherit (pkgs) lib;
+        inherit (pkgs.stdenv) isLinux isDarwin;
 
-      # Configure LLVM and python version for the environment
-      llvmVersion = "20";
-      pythonVersion = "13";
+        python = pkgs.python313;
+        llvmPackages = pkgs.llvmPackages_latest;
 
-      llvmPackages = pkgs."llvmPackages_${llvmVersion}";
-      llvmTools = {
-        inherit (llvmPackages) bintools clang clang-tools;
-        lldb = pkgs."lldb_${llvmVersion}";
-      };
+        # Use a full llvm toolchain including bintools
+        stdEnv =
+          let
+            llvmStdenv = llvmPackages.stdenv.override {
+              cc = llvmPackages.stdenv.cc.override {
+                bintools = llvmPackages.bintools;
+              };
+            };
+          in
+          if isLinux then
+            # Mold linker is much faster on Linux
+            pkgs.stdenvAdapters.useMoldLinker (pkgs.ccacheStdenv.override { stdenv = llvmStdenv; })
+          else
+            pkgs.ccacheStdenv.override { stdenv = llvmStdenv; };
 
-      # Helper for platform-specific packages
-      platformPkgs = cond: pkgs:
-        if cond
-        then pkgs
-        else [];
-
-      # Use a single pythonEnv throughout and specifically in the devShell to make sure bcc is available.
-      pythonEnv = pkgs."python3${pythonVersion}".withPackages (ps:
-        with ps;
+        pythonEnv = python.withPackages (
+          ps:
+          with ps;
           [
             flake8
             lief
@@ -43,69 +59,76 @@
             pyzmq
             vulture
           ]
-          ++ platformPkgs isLinux [
+          ++ lib.optionals isLinux [
             bcc
-          ]);
+          ]
+        );
 
-      # Will only exist in the build environment
-      nativeBuildInputs = with pkgs;
-        [
-          bison
-          ccache
-          cmake
-          curlMinimal
-          llvmTools.bintools
-          llvmTools.clang
-          llvmTools.clang-tools
-          ninja
-          pkg-config
-          qt6.wrapQtAppsHook # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
-          xz
-        ]
-        ++ platformPkgs isLinux [
-          libsystemtap
-          linuxPackages.bcc
-          linuxPackages.bpftrace
+        # Will only exist in the build environment
+        nativeBuildInputs =
+          with pkgs;
+          [
+            bison
+            ccache
+            clang-tools
+            cmakeCurses
+            curlMinimal
+            ninja
+            pkg-config
+            xz
+          ]
+          ++ lib.optionals isLinux [
+            libsystemtap
+            linuxPackages.bcc
+            linuxPackages.bpftrace
+          ];
+
+        qtBuildInputs = with pkgs; [
+          qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
+          qt6.qttools
         ];
 
-      # Will exist in the runtime environment
-      buildInputs = with pkgs;
-        [
+        # Will exist in the runtime environment
+        buildInputs = with pkgs; [
           boost
           capnproto
           libevent
           qrencode
-          qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
-          qt6.qttools
           sqlite.dev
           zeromq
-        ]
-        ++ platformPkgs isLinux [
-          libsystemtap
-          linuxPackages.bcc
-          linuxPackages.bpftrace
         ];
 
-      env = {
-        CMAKE_GENERATOR = "Ninja";
-        LD_LIBRARY_PATH = lib.makeLibraryPath [pkgs.capnproto];
-        LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
-      };
-    in {
-      # We use mkShelNoCC to avoid having Nix set up a gcc-based build environment
-      devShells.default = pkgs.mkShellNoCC {
-        inherit nativeBuildInputs buildInputs;
-        packages =
-          [
-            pythonEnv
-            pkgs.codespell
-            pkgs.hexdump
-          ]
-          ++ platformPkgs isLinux [pkgs.gdb]
-          ++ platformPkgs isDarwin [llvmTools.lldb];
-        inherit (env) CMAKE_GENERATOR LD_LIBRARY_PATH LOCALE_ARCHIVE;
-      };
+        mkDevShell =
+          nativeInputs: buildInputs:
+          (pkgs.mkShell.override { stdenv = stdEnv; }) {
+            inherit nativeBuildInputs buildInputs;
+            packages = [
+              pkgs.include-what-you-use
+              pythonEnv
+              pkgs.codespell
+              pkgs.hexdump
+            ]
+            ++ lib.optionals isLinux [ pkgs.gdb ]
+            ++ lib.optionals isDarwin [ llvmPackages.lldb ];
 
-      formatter = pkgs.alejandra;
-    });
+            CMAKE_GENERATOR = "Ninja";
+            CMAKE_EXPORT_COMPILE_COMMANDS = 1;
+            LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
+            LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
+          };
+
+      in
+      {
+        devShells.default = mkDevShell (nativeBuildInputs ++ [ pkgs.qt6.wrapQtAppsHook ]) (
+          buildInputs ++ qtBuildInputs
+        );
+        devShells.depends = (mkDevShell nativeBuildInputs qtBuildInputs).overrideAttrs (oldAttrs: {
+          # Set these to force depends capnp to also use clang, otherwise it
+          # fails when looking for the default (gcc/g++)
+          build_CC = "clang";
+          build_CXX = "clang++";
+        });
+        formatter = pkgs.nixfmt-tree;
+      }
+    );
 }
