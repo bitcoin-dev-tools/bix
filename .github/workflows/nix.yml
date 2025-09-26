@@ -21,15 +21,19 @@ jobs:
         include:
           - system: x86_64-linux
             runner_label: ubuntu-latest
+            cores: 4
             cmake_flags:
           - system: aarch64-linux
             runner_label: ubuntu-24.04-arm
+            cores: 4
             cmake_flags:
           - system: x86_64-darwin
-            runner_label: macos-13
+            runner_label: macos-15-intel
+            cores: 4
             cmake_flags: -DWITH_USDT=OFF
           - system: aarch64-darwin
-            runner_label: macos-14
+            runner_label: macos-latest
+            cores: 3
             cmake_flags: -DWITH_USDT=OFF
 
     env:
@@ -85,7 +89,11 @@ jobs:
             set -eux
             export CCACHE_DIR=${{ env.CCACHE_DIR }}
             cd bitcoin
-            cmake -B build -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache --preset dev-mode ${{ matrix.cmake_flags }}
-            cmake --build build -j$(nproc)
+            cmake -B build \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              --preset dev-mode \
+              ${{ matrix.cmake_flags }}
+            cmake --build build -j${{ matrix.cores }}
             ccache --show-stats
           "
