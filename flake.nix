@@ -30,11 +30,11 @@
       python = pkgs.python313;
       llvmPackages = pkgs.llvmPackages_20;
 
-      # On Darwin use clang-20 otherwise use a gcc15 (and mold)-based standard env.
+      # On Darwin use clang-20 otherwise use a gcc15 (and mold)-based standard env with ccache.
       stdEnv =
         if isDarwin
         then llvmPackages.stdenv
-        else pkgs.stdenvAdapters.useMoldLinker pkgs.gcc15Stdenv;
+        else pkgs.stdenvAdapters.useMoldLinker (pkgs.ccacheStdenv.override {stdenv = pkgs.gcc15Stdenv;});
 
       pythonEnv = python.withPackages (ps:
         with ps;
