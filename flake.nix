@@ -3,16 +3,27 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs-qt6.url = "github:NixOS/nixpkgs/0c0e48b0ec1af2d7f7de70f839de1569927fe4c8";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs = {
     nixpkgs,
+    nixpkgs-qt6,
     flake-utils,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = import nixpkgs {inherit system;};
+      # Overlay depends-matching version of qt6: https://github.com/bitcoin/bitcoin/blob/master/depends/packages/qt_details.mk#L1
+      qtPkgs = import nixpkgs-qt6 {inherit system;};
+      pkgs = import nixpkgs {
+        inherit system;
+        overlays = [
+          (final: prev: {
+            qt6 = qtPkgs.qt6;
+          })
+        ];
+      };
       inherit (pkgs) lib;
       inherit (pkgs.stdenv) isLinux isDarwin;
 
@@ -56,22 +67,19 @@
           linuxPackages.bpftrace
         ];
 
+      qtBuildInputs = with pkgs; [
+        qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
+        qt6.qttools
+      ];
+
       # Will exist in the runtime environment
       buildInputs = with pkgs; [
         boost
         capnproto
         libevent
         qrencode
-        qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
-        qt6.qttools
         sqlite.dev
         zeromq
-      ];
-
-      # Qt-only build inputs needed for depends shell
-      qtBuildInputs = with pkgs; [
-        qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
-        qt6.qttools
       ];
 
       mkDevShell = nativeInputs: buildInputs:
@@ -92,7 +100,7 @@
           LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
         };
     in {
-      devShells.default = mkDevShell (nativeBuildInputs ++ [pkgs.qt6.wrapQtAppsHook]) buildInputs;
+      devShells.default = mkDevShell (nativeBuildInputs ++ [pkgs.qt6.wrapQtAppsHook]) (buildInputs ++ qtBuildInputs);
       devShells.depends = mkDevShell nativeBuildInputs qtBuildInputs;
 
       formatter = pkgs.alejandra;
