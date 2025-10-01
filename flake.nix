@@ -70,6 +70,10 @@
       qtBuildInputs = with pkgs; [
         qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
         qt6.qttools
+      ] ++ lib.optionals isLinux [
+        qt6.qtwayland
+        wayland
+        wayland-protocols
       ];
 
       # Will exist in the runtime environment
