@@ -33,6 +33,7 @@
         python = pkgs.python313;
         llvmPackages = pkgs.llvmPackages_latest;
 
+        # Use a full llvm toolchain including bintools
         stdEnv =
           let
             llvmStdenv = llvmPackages.stdenv.override {
