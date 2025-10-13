@@ -30,11 +30,18 @@
       python = pkgs.python313;
       llvmPackages = pkgs.llvmPackages_20;
 
-      # On Darwin use clang-20 otherwise use a gcc15 (and mold)-based standard env with ccache.
-      stdEnv =
+      # Use clang-20 (and mold)-based standard env with ccache and full LLVM toolchain.
+      stdEnv = let
+        # Create a stdenv with the full LLVM toolchain including llvm-ranlib, llvm-strip, etc.
+        fullLlvmStdenv = llvmPackages.stdenv.override {
+          cc = llvmPackages.stdenv.cc.override {
+            bintools = llvmPackages.bintools;
+          };
+        };
+      in
         if isDarwin
-        then llvmPackages.stdenv
-        else pkgs.stdenvAdapters.useMoldLinker (pkgs.ccacheStdenv.override {stdenv = pkgs.gcc15Stdenv;});
+        then fullLlvmStdenv
+        else pkgs.stdenvAdapters.useMoldLinker (pkgs.ccacheStdenv.override {stdenv = fullLlvmStdenv;});
 
       pythonEnv = python.withPackages (ps:
         with ps;
@@ -70,10 +77,6 @@
       qtBuildInputs = with pkgs; [
         qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
         qt6.qttools
-      ] ++ lib.optionals isLinux [
-        qt6.qtwayland
-        wayland
-        wayland-protocols
       ];
 
       # Will exist in the runtime environment
@@ -85,6 +88,9 @@
         sqlite.dev
         zeromq
       ];
+
+      # Cross-compilation setup - unwrapped clang toolchain using consistent LLVM version
+      crossStdenv = llvmPackages.stdenv;
 
       mkDevShell = nativeInputs: buildInputs:
         (pkgs.mkShell.override {stdenv = stdEnv;}) {
@@ -103,9 +109,32 @@
           LD_LIBRARY_PATH = lib.makeLibraryPath [pkgs.capnproto];
           LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
         };
+
+      mkCrossDevShell = nativeInputs: buildInputs:
+        (pkgs.mkShell.override {stdenv = crossStdenv;}) {
+          nativeBuildInputs = nativeInputs ++ [
+            # Unwrapped clang toolchain for cross-compilation using LLVM 20
+            llvmPackages.clang-unwrapped
+            llvmPackages.lld
+            llvmPackages.bintools-unwrapped
+          ];
+          buildInputs = buildInputs;
+          packages =
+            [
+              pythonEnv
+              pkgs.codespell
+              pkgs.hexdump
+              pkgs.gdb
+            ];
+
+          CMAKE_GENERATOR = "Ninja";
+          CMAKE_EXPORT_COMPILE_COMMANDS = 1;
+          LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
+        };
     in {
       devShells.default = mkDevShell (nativeBuildInputs ++ [pkgs.qt6.wrapQtAppsHook]) (buildInputs ++ qtBuildInputs);
       devShells.depends = mkDevShell nativeBuildInputs qtBuildInputs;
+      devShells.cross = mkCrossDevShell nativeBuildInputs [];
 
       formatter = pkgs.alejandra;
     });
