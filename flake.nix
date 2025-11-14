@@ -120,7 +120,11 @@
         devShells.default = mkDevShell (nativeBuildInputs ++ [ pkgs.qt6.wrapQtAppsHook ]) (
           buildInputs ++ qtBuildInputs
         );
-        devShells.depends = mkDevShell nativeBuildInputs qtBuildInputs;
+        devShells.depends = (mkDevShell nativeBuildInputs qtBuildInputs).overrideAttrs (oldAttrs: {
+          # Set these to force capnp to also use clang, otherwise it fails looking from the default gcc/g++
+          build_CC = "clang";
+          build_CXX = "clang++";
+        });
         formatter = pkgs.nixfmt-tree;
       }
     );
