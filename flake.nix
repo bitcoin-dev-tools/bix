@@ -69,7 +69,7 @@
             bison
             ccache
             clang-tools
-            cmake
+            cmakeCurses
             curlMinimal
             ninja
             pkg-config
