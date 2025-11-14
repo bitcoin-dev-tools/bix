@@ -101,6 +101,7 @@
           (pkgs.mkShell.override { stdenv = stdEnv; }) {
             inherit nativeBuildInputs buildInputs;
             packages = [
+              pkgs.include-what-you-use
               pythonEnv
               pkgs.codespell
               pkgs.hexdump
