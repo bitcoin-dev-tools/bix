@@ -22,17 +22,19 @@
         python = pkgs.python313;
         llvmPackages = pkgs.llvmPackages_latest;
 
-        # Use a full llvm toolchain including bintools
         stdEnv =
           let
-            llvmStdenv = llvmPackages.stdenv.override {
-              cc = llvmPackages.stdenv.cc.override {
-                bintools = llvmPackages.bintools;
-              };
-            };
+            llvmStdenv =
+              if isLinux then
+                llvmPackages.stdenv.override {
+                  cc = llvmPackages.stdenv.cc.override {
+                    bintools = llvmPackages.bintools;
+                  };
+                }
+              else
+                llvmPackages.stdenv;
           in
           if isLinux then
-            # Mold linker is much faster on Linux
             pkgs.stdenvAdapters.useMoldLinker (pkgs.ccacheStdenv.override { stdenv = llvmStdenv; })
           else
             pkgs.ccacheStdenv.override { stdenv = llvmStdenv; };
