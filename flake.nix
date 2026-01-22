@@ -3,7 +3,6 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-qt6.url = "github:NixOS/nixpkgs/0c0e48b0ec1af2d7f7de70f839de1569927fe4c8";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
@@ -11,7 +10,6 @@
   outputs =
     {
       nixpkgs,
-      nixpkgs-qt6,
       nixpkgs-unstable,
       flake-utils,
       ...
@@ -19,18 +17,8 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        # Overlay depends-matching version of qt6:
-        # https://github.com/bitcoin/bitcoin/blob/master/depends/packages/qt_details.mk#L1
-        qtPkgs = import nixpkgs-qt6 { inherit system; };
         unstablePkgs = import nixpkgs-unstable { inherit system; };
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [
-            (final: prev: {
-              qt6 = qtPkgs.qt6;
-            })
-          ];
-        };
+        pkgs = import nixpkgs { inherit system; };
         inherit (pkgs) lib;
         inherit (pkgs.stdenv) isLinux isDarwin;
 
