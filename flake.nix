@@ -3,21 +3,18 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs =
     {
       nixpkgs,
-      nixpkgs-unstable,
       flake-utils,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        unstablePkgs = import nixpkgs-unstable { inherit system; };
         pkgs = import nixpkgs { inherit system; };
         inherit (pkgs) lib;
         inherit (pkgs.stdenv) isLinux isDarwin;
@@ -98,7 +95,7 @@
               pkgs.hexdump
               pkgs.include-what-you-use
               pkgs.ruff
-              unstablePkgs.ty
+              pkgs.ty
               pythonEnv
             ]
             ++ lib.optionals isLinux [ pkgs.gdb ]
