@@ -4,6 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-qt6.url = "github:NixOS/nixpkgs/0c0e48b0ec1af2d7f7de70f839de1569927fe4c8";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -11,6 +12,7 @@
     {
       nixpkgs,
       nixpkgs-qt6,
+      nixpkgs-unstable,
       flake-utils,
       ...
     }:
@@ -20,6 +22,7 @@
         # Overlay depends-matching version of qt6:
         # https://github.com/bitcoin/bitcoin/blob/master/depends/packages/qt_details.mk#L1
         qtPkgs = import nixpkgs-qt6 { inherit system; };
+        unstablePkgs = import nixpkgs-unstable { inherit system; };
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
@@ -65,37 +68,35 @@
         );
 
         # Will only exist in the build environment
-        nativeBuildInputs =
-          with pkgs;
-          [
-            bison
-            ccache
-            clang-tools
-            cmakeCurses
-            curlMinimal
-            ninja
-            pkg-config
-            xz
-          ]
-          ++ lib.optionals isLinux [
-            libsystemtap
-            linuxPackages.bcc
-            linuxPackages.bpftrace
-          ];
+        nativeBuildInputs = [
+          pkgs.bison
+          pkgs.ccache
+          pkgs.clang-tools
+          pkgs.cmakeCurses
+          pkgs.curlMinimal
+          pkgs.ninja
+          pkgs.pkg-config
+          pkgs.xz
+        ]
+        ++ lib.optionals isLinux [
+          pkgs.libsystemtap
+          pkgs.linuxPackages.bcc
+          pkgs.linuxPackages.bpftrace
+        ];
 
-        qtBuildInputs = with pkgs; [
-          qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
-          qt6.qttools
+        qtBuildInputs = [
+          pkgs.qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
+          pkgs.qt6.qttools
         ];
 
         # Will exist in the runtime environment
-        buildInputs = with pkgs; [
-          boost
-          capnproto
-          libevent
-          qrencode
-          sqlite.dev
-          zeromq
+        buildInputs = [
+          pkgs.boost
+          pkgs.capnproto
+          pkgs.libevent
+          pkgs.qrencode
+          pkgs.sqlite.dev
+          pkgs.zeromq
         ];
 
         mkDevShell =
@@ -103,10 +104,12 @@
           (pkgs.mkShell.override { stdenv = stdEnv; }) {
             inherit nativeBuildInputs buildInputs;
             packages = [
-              pkgs.include-what-you-use
-              pythonEnv
               pkgs.codespell
               pkgs.hexdump
+              pkgs.include-what-you-use
+              pkgs.ruff
+              unstablePkgs.ty
+              pythonEnv
             ]
             ++ lib.optionals isLinux [ pkgs.gdb ]
             ++ lib.optionals isDarwin [ llvmPackages.lldb ];
@@ -116,7 +119,6 @@
             LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
             LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
           };
-
       in
       {
         devShells.default = mkDevShell (nativeBuildInputs ++ [ pkgs.qt6.wrapQtAppsHook ]) (
