@@ -92,6 +92,7 @@
           nativeInputs: buildInputs:
           (pkgs.mkShell.override { stdenv = stdEnv; }) {
             inherit nativeBuildInputs buildInputs;
+            hardeningDisable = lib.optionals isDarwin [ "stackclashprotection" ];
             packages = [
               pkgs.codespell
               pkgs.hexdump
