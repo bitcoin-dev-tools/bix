@@ -60,6 +60,8 @@
             lief
             mypy
             pyzmq
+            pycapnp
+            requests
             vulture
           ]
           ++ lib.optionals isLinux [
