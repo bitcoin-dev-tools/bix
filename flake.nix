@@ -15,7 +15,23 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [
+            (final: prev: {
+              capnproto = prev.capnproto.overrideAttrs (oldAttrs: rec {
+                version = "1.3.0";
+                src = prev.fetchFromGitHub {
+                  owner = "capnproto";
+                  repo = "capnproto";
+                  rev = "v${version}";
+                  hash = "sha256-fvZzNDBZr73U+xbj1LhVj1qWZyNmblKluh7lhacV+6I=";
+                };
+                patches = [ ];
+              });
+            })
+          ];
+        };
         inherit (pkgs) lib;
         inherit (pkgs.stdenv) isLinux isDarwin;
 
