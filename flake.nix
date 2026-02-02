@@ -38,6 +38,25 @@
         python = pkgs.python313;
         llvmPackages = pkgs.llvmPackages_latest;
 
+        clang-tidy-diff =
+          pkgs.runCommand "clang-tidy-diff"
+            {
+              nativeBuildInputs = [ pkgs.makeWrapper ];
+            }
+            ''
+              mkdir -p $out/bin
+              cp ${llvmPackages.clang-unwrapped.src}/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py \
+                $out/bin/clang-tidy-diff
+              chmod +x $out/bin/clang-tidy-diff
+              wrapProgram $out/bin/clang-tidy-diff \
+                --prefix PATH : ${
+                  lib.makeBinPath [
+                    pkgs.clang-tools
+                    pythonEnv
+                  ]
+                }
+            '';
+
         stdEnv =
           let
             llvmStdenv =
@@ -110,6 +129,7 @@
             inherit nativeBuildInputs buildInputs;
             hardeningDisable = lib.optionals isDarwin [ "stackclashprotection" ];
             packages = [
+              clang-tidy-diff
               pkgs.codespell
               pkgs.hexdump
               pkgs.include-what-you-use
