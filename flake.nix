@@ -126,7 +126,8 @@
         mkDevShell =
           nativeInputs: buildInputs:
           (pkgs.mkShell.override { stdenv = stdEnv; }) {
-            inherit nativeBuildInputs buildInputs;
+            nativeBuildInputs = nativeInputs;
+            inherit buildInputs;
             hardeningDisable = lib.optionals isDarwin [ "stackclashprotection" ];
             packages = [
               clang-tidy-diff
@@ -137,7 +138,10 @@
               pkgs.ty
               pythonEnv
             ]
-            ++ lib.optionals isLinux [ pkgs.gdb ]
+            ++ lib.optionals isLinux [
+              pkgs.gdb
+              pkgs.valgrind
+            ]
             ++ lib.optionals isDarwin [ llvmPackages.lldb ];
 
             CMAKE_GENERATOR = "Ninja";
@@ -147,8 +151,8 @@
           };
       in
       {
-        devShells.default = mkDevShell (nativeBuildInputs ++ [ pkgs.qt6.wrapQtAppsHook ]) (
-          buildInputs ++ qtBuildInputs
+        devShells.default = mkDevShell nativeBuildInputs (
+          buildInputs ++ qtBuildInputs ++ [ pkgs.qt6.wrapQtAppsHook ]
         );
         devShells.depends = (mkDevShell nativeBuildInputs qtBuildInputs).overrideAttrs (oldAttrs: {
           # Set these to force depends capnp to also use clang, otherwise it
