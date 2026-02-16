@@ -19,6 +19,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       SOURCES_PATH: ${{ github.workspace }}/depends-sources
       BASE_CACHE: ${{ github.workspace }}/depends-base
+      NIX_SHOW_LOG: "1"
 
     steps:
       - name: Checkout Repo
@@ -27,8 +28,8 @@ jobs:
       - name: Checkout Bitcoin Repo
         uses: actions/checkout@v4
         with:
-          repository: willcl-ark/bitcoin
-          ref: cmake-dependency-provider
+          repository: bitcoin/bitcoin
+          ref: master
           path: bitcoin
           fetch-depth: 1
 
@@ -80,7 +81,7 @@ jobs:
 
       - name: Build bitcoin from depends
         run: |
-          nix develop --command bash -c "
+          nix develop .#depends --command bash -c "
             set -eux
 
             export CCACHE_DIR=${{ env.CCACHE_DIR }}
@@ -90,8 +91,8 @@ jobs:
             cd bitcoin
             HOST_TRIPLET=\$(./depends/config.guess)
             export HOST_TRIPLET
-            make -C depends -j\$(nproc) NO_QT=1
-            cmake -B build --toolchain \"depends/\$HOST_TRIPLET/toolchain.cmake\" -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=\"depends/\$HOST_TRIPLET/dependency_provider.cmake\"
+            make -C depends -j\$(nproc) NO_QT=1 build_CC="$CC" build_CXX="$CXX"
+            cmake -B build --toolchain \"depends/\$HOST_TRIPLET/toolchain.cmake\"
             cmake --build build -j\$(nproc)
             ccache --show-stats
           "
