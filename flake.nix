@@ -57,6 +57,20 @@
                 }
             '';
 
+        patchelf-releases = pkgs.writeShellApplication {
+          name = "patchelf-releases";
+          runtimeInputs = with pkgs; [
+            patchelf
+            file
+            findutils
+            gnugrep
+          ];
+          text = builtins.replaceStrings
+            [ "@interp@" ]
+            [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" ]
+            (builtins.readFile ./scripts/patchelf-releases.sh);
+        };
+
         stdEnv =
           let
             llvmStdenv =
@@ -137,8 +151,14 @@
               pkgs.ruff
               pkgs.ty
               pythonEnv
+              # vouch
+              pkgs.gh
+              pkgs.nodePackages.prettier
+              pkgs.nushell
+              pkgs.pinact
             ]
             ++ lib.optionals isLinux [
+              patchelf-releases
               pkgs.gdb
               pkgs.valgrind
             ]
