@@ -86,7 +86,7 @@
           let
             moldStdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker llvmStdenv else llvmStdenv;
           in
-            pkgs.ccacheStdenv.override { stdenv = moldStdenv; };
+          pkgs.ccacheStdenv.override { stdenv = moldStdenv; };
 
         pythonEnv = python.withPackages (
           ps:
@@ -146,6 +146,7 @@
             packages = [
               clang-tidy-diff
               pkgs.codespell
+              pkgs.doxygen
               pkgs.hexdump
               pkgs.include-what-you-use
               pkgs.ruff
