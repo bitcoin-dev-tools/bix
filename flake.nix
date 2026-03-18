@@ -146,6 +146,7 @@
             packages = [
               clang-tidy-diff
               pkgs.codespell
+              pkgs.doxygen
               pkgs.hexdump
               pkgs.include-what-you-use
               pkgs.ruff
