@@ -17,20 +17,6 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [
-            (final: prev: {
-              capnproto = prev.capnproto.overrideAttrs (oldAttrs: rec {
-                version = "1.3.0";
-                src = prev.fetchFromGitHub {
-                  owner = "capnproto";
-                  repo = "capnproto";
-                  rev = "v${version}";
-                  hash = "sha256-fvZzNDBZr73U+xbj1LhVj1qWZyNmblKluh7lhacV+6I=";
-                };
-                patches = [ ];
-              });
-            })
-          ];
         };
         inherit (pkgs) lib;
         inherit (pkgs.stdenv) isLinux isDarwin;
@@ -156,16 +142,15 @@
             CMAKE_EXPORT_COMPILE_COMMANDS = 1;
             LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
             LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
+            # Force depends capnp to also use clang, otherwise it fails when
+            # looking for the default (gcc/g++)
+            build_CC = "clang";
+            build_CXX = "clang++";
           };
       in
       {
         devShells.default = mkDevShell nativeBuildInputs buildInputs;
-        devShells.depends = (mkDevShell nativeBuildInputs [ ]).overrideAttrs (oldAttrs: {
-          # Set these to force depends capnp to also use clang, otherwise it
-          # fails when looking for the default (gcc/g++)
-          build_CC = "clang";
-          build_CXX = "clang++";
-        });
+        devShells.depends = mkDevShell nativeBuildInputs [ ];
         formatter = pkgs.nixfmt-tree;
       }
     );
