@@ -97,7 +97,6 @@
             pyzmq
             pycapnp
             requests
-            vulture
           ]
           ++ lib.optionals isLinux [
             bcc
