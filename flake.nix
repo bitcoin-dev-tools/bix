@@ -83,10 +83,10 @@
               else
                 llvmPackages.stdenv;
           in
-          if isLinux then
-            pkgs.stdenvAdapters.useMoldLinker (pkgs.ccacheStdenv.override { stdenv = llvmStdenv; })
-          else
-            pkgs.ccacheStdenv.override { stdenv = llvmStdenv; };
+          let
+            moldStdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker llvmStdenv else llvmStdenv;
+          in
+            pkgs.ccacheStdenv.override { stdenv = moldStdenv; };
 
         pythonEnv = python.withPackages (
           ps:
