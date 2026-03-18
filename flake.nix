@@ -122,17 +122,11 @@
           pkgs.linuxPackages.bpftrace
         ];
 
-        qtBuildInputs = [
-          pkgs.qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
-          pkgs.qt6.qttools
-        ];
-
         # Will exist in the runtime environment
         buildInputs = [
           pkgs.boost
           pkgs.capnproto
           pkgs.libevent
-          pkgs.qrencode
           pkgs.sqlite.dev
           pkgs.zeromq
         ];
@@ -152,11 +146,6 @@
               pkgs.ruff
               pkgs.ty
               pythonEnv
-              # vouch
-              pkgs.gh
-              pkgs.nodePackages.prettier
-              pkgs.nushell
-              pkgs.pinact
             ]
             ++ lib.optionals isLinux [
               patchelf-releases
@@ -172,10 +161,8 @@
           };
       in
       {
-        devShells.default = mkDevShell nativeBuildInputs (
-          buildInputs ++ qtBuildInputs ++ [ pkgs.qt6.wrapQtAppsHook ]
-        );
-        devShells.depends = (mkDevShell nativeBuildInputs qtBuildInputs).overrideAttrs (oldAttrs: {
+        devShells.default = mkDevShell nativeBuildInputs buildInputs;
+        devShells.depends = (mkDevShell nativeBuildInputs).overrideAttrs (oldAttrs: {
           # Set these to force depends capnp to also use clang, otherwise it
           # fails when looking for the default (gcc/g++)
           build_CC = "clang";

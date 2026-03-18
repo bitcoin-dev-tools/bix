@@ -94,6 +94,7 @@ jobs:
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               --preset dev-mode \
+              -DBUILD_GUI=OFF \
               ${{ matrix.cmake_flags }}
             cmake --build build -j${{ matrix.cores }}
             ccache --show-stats
