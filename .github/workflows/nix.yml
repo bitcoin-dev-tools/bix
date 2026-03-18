@@ -28,8 +28,8 @@ jobs:
             cores: 4
             cmake_flags:
           - system: x86_64-darwin
-            runner_label: macos-15-intel
-            cores: 4
+            runner_label: macos-latest
+            cores: 3
             cmake_flags: -DWITH_USDT=OFF
           - system: aarch64-darwin
             runner_label: macos-latest
