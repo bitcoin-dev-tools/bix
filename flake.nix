@@ -65,10 +65,9 @@
             findutils
             gnugrep
           ];
-          text = builtins.replaceStrings
-            [ "@interp@" ]
-            [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" ]
-            (builtins.readFile ./scripts/patchelf-releases.sh);
+          text = builtins.replaceStrings [ "@interp@" ] [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" ] (
+            builtins.readFile ./scripts/patchelf-releases.sh
+          );
         };
 
         stdEnv =
@@ -162,7 +161,7 @@
       in
       {
         devShells.default = mkDevShell nativeBuildInputs buildInputs;
-        devShells.depends = (mkDevShell nativeBuildInputs).overrideAttrs (oldAttrs: {
+        devShells.depends = (mkDevShell nativeBuildInputs [ ]).overrideAttrs (oldAttrs: {
           # Set these to force depends capnp to also use clang, otherwise it
           # fails when looking for the default (gcc/g++)
           build_CC = "clang";
