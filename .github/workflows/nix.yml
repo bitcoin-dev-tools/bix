@@ -28,8 +28,8 @@ jobs:
             cores: 4
             cmake_flags:
           - system: x86_64-darwin
-            runner_label: macos-15-intel
-            cores: 4
+            runner_label: macos-latest
+            cores: 3
             cmake_flags: -DWITH_USDT=OFF
           - system: aarch64-darwin
             runner_label: macos-latest
@@ -85,16 +85,4 @@ jobs:
         run: nix flake check
 
       - name: Build bitcoind
-        run: |
-          nix develop --command bash -c "
-            set -eux
-            export CCACHE_DIR=${{ env.CCACHE_DIR }}
-            cd bitcoin
-            cmake -B build \
-              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-              --preset dev-mode \
-              ${{ matrix.cmake_flags }}
-            cmake --build build -j${{ matrix.cores }}
-            ccache --show-stats
-          "
+        run: nix develop --command ./scripts/build-systemlibs.sh ${{ matrix.cores }} ${{ matrix.cmake_flags }}

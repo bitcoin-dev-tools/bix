@@ -17,20 +17,6 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [
-            (final: prev: {
-              capnproto = prev.capnproto.overrideAttrs (oldAttrs: rec {
-                version = "1.3.0";
-                src = prev.fetchFromGitHub {
-                  owner = "capnproto";
-                  repo = "capnproto";
-                  rev = "v${version}";
-                  hash = "sha256-fvZzNDBZr73U+xbj1LhVj1qWZyNmblKluh7lhacV+6I=";
-                };
-                patches = [ ];
-              });
-            })
-          ];
         };
         inherit (pkgs) lib;
         inherit (pkgs.stdenv) isLinux isDarwin;
@@ -57,6 +43,19 @@
                 }
             '';
 
+        patchelf-releases = pkgs.writeShellApplication {
+          name = "patchelf-releases";
+          runtimeInputs = with pkgs; [
+            patchelf
+            file
+            findutils
+            gnugrep
+          ];
+          text = builtins.replaceStrings [ "@interp@" ] [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" ] (
+            builtins.readFile ./scripts/patchelf-releases.sh
+          );
+        };
+
         stdEnv =
           let
             llvmStdenv =
@@ -69,10 +68,10 @@
               else
                 llvmPackages.stdenv;
           in
-          if isLinux then
-            pkgs.stdenvAdapters.useMoldLinker (pkgs.ccacheStdenv.override { stdenv = llvmStdenv; })
-          else
-            pkgs.ccacheStdenv.override { stdenv = llvmStdenv; };
+          let
+            moldStdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker llvmStdenv else llvmStdenv;
+          in
+          pkgs.ccacheStdenv.override { stdenv = moldStdenv; };
 
         pythonEnv = python.withPackages (
           ps:
@@ -84,7 +83,6 @@
             pyzmq
             pycapnp
             requests
-            vulture
           ]
           ++ lib.optionals isLinux [
             bcc
@@ -108,17 +106,11 @@
           pkgs.linuxPackages.bpftrace
         ];
 
-        qtBuildInputs = [
-          pkgs.qt6.qtbase # https://nixos.org/manual/nixpkgs/stable/#sec-language-qt
-          pkgs.qt6.qttools
-        ];
-
         # Will exist in the runtime environment
         buildInputs = [
           pkgs.boost
           pkgs.capnproto
           pkgs.libevent
-          pkgs.qrencode
           pkgs.sqlite.dev
           pkgs.zeromq
         ];
@@ -132,6 +124,7 @@
             packages = [
               clang-tidy-diff
               pkgs.codespell
+              pkgs.doxygen
               pkgs.hexdump
               pkgs.include-what-you-use
               pkgs.ruff
@@ -139,6 +132,7 @@
               pythonEnv
             ]
             ++ lib.optionals isLinux [
+              patchelf-releases
               pkgs.gdb
               pkgs.valgrind
             ]
@@ -148,18 +142,15 @@
             CMAKE_EXPORT_COMPILE_COMMANDS = 1;
             LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
             LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
+            # Force depends capnp to also use clang, otherwise it fails when
+            # looking for the default (gcc/g++)
+            build_CC = "clang";
+            build_CXX = "clang++";
           };
       in
       {
-        devShells.default = mkDevShell nativeBuildInputs (
-          buildInputs ++ qtBuildInputs ++ [ pkgs.qt6.wrapQtAppsHook ]
-        );
-        devShells.depends = (mkDevShell nativeBuildInputs qtBuildInputs).overrideAttrs (oldAttrs: {
-          # Set these to force depends capnp to also use clang, otherwise it
-          # fails when looking for the default (gcc/g++)
-          build_CC = "clang";
-          build_CXX = "clang++";
-        });
+        devShells.default = mkDevShell nativeBuildInputs buildInputs;
+        devShells.depends = mkDevShell nativeBuildInputs [ ];
         formatter = pkgs.nixfmt-tree;
       }
     );

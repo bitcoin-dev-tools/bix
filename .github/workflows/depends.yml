@@ -80,19 +80,8 @@ jobs:
         run: nix flake check
 
       - name: Build bitcoin from depends
-        run: |
-          nix develop .#depends --command bash -c "
-            set -eux
-
-            export CCACHE_DIR=${{ env.CCACHE_DIR }}
-            export SOURCES_PATH=${{ env.SOURCES_PATH }}
-            export BASE_CACHE=${{ env.BASE_CACHE }}
-
-            cd bitcoin
-            HOST_TRIPLET=\$(./depends/config.guess)
-            export HOST_TRIPLET
-            make -C depends -j\$(nproc) NO_QT=1 build_CC="$CC" build_CXX="$CXX"
-            cmake -B build --toolchain \"depends/\$HOST_TRIPLET/toolchain.cmake\"
-            cmake --build build -j\$(nproc)
-            ccache --show-stats
-          "
+        env:
+          CCACHE_DIR: ${{ env.CCACHE_DIR }}
+          SOURCES_PATH: ${{ env.SOURCES_PATH }}
+          BASE_CACHE: ${{ env.BASE_CACHE }}
+        run: nix develop .#depends --command ./scripts/build-depends.sh

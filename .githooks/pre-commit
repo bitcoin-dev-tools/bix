@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+nix fmt . 2>/dev/null
+
+changed=$(git diff --name-only)
+if [ -n "$changed" ]; then
+    echo "nix fmt modified files:"
+    echo "$changed"
+    echo ""
+    echo "Stage the changes and retry your commit."
+    exit 1
+fi
