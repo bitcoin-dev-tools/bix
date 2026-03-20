@@ -85,17 +85,4 @@ jobs:
         run: nix flake check
 
       - name: Build bitcoind
-        run: |
-          nix develop --command bash -c "
-            set -eux
-            export CCACHE_DIR=${{ env.CCACHE_DIR }}
-            cd bitcoin
-            cmake -B build \
-              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-              --preset dev-mode \
-              -DBUILD_GUI=OFF \
-              ${{ matrix.cmake_flags }}
-            cmake --build build -j${{ matrix.cores }}
-            ccache --show-stats
-          "
+        run: nix develop --command ./scripts/build-systemlibs.sh ${{ matrix.cores }} ${{ matrix.cmake_flags }}
