@@ -80,32 +80,8 @@ jobs:
         run: nix flake check
 
       - name: Build bitcoin from depends
-        run: |
-          nix develop .#depends --command bash -c "
-            set -eux
-
-            export CCACHE_DIR=${{ env.CCACHE_DIR }}
-            export SOURCES_PATH=${{ env.SOURCES_PATH }}
-            export BASE_CACHE=${{ env.BASE_CACHE }}
-
-            cd bitcoin
-            HOST_TRIPLET=\$(./depends/config.guess)
-            export HOST_TRIPLET
-#
-            # Nix sets CC/CXX to bare names (e.g. 'clang'), relying on PATH.
-            # The depends Makefile substitutes CC/CXX into toolchain.cmake,
-            # but cmake's find_program searches system dirs before PATH,
-            # so a bare 'clang' resolves to /usr/bin/clang (system) instead
-            # of the Nix clang. This causes glibc version mismatches: Nix
-            # compiles against glibc 2.42 headers, but the system linker
-            # links against the runner's older glibc, producing undefined
-            # references to fortified symbols like __inet_pton_chk.
-            # Resolve to absolute Nix store paths to avoid this.
-            NIX_CC=\$(command -v \$CC)
-            NIX_CXX=\$(command -v \$CXX)
-            make -C depends -j\$(nproc) NO_QT=1 CC="\$NIX_CC" CXX="\$NIX_CXX" build_CC="\$NIX_CC" build_CXX="\$NIX_CXX"
-
-            cmake -B build --toolchain \"depends/\$HOST_TRIPLET/toolchain.cmake\"
-            cmake --build build -j\$(nproc)
-            ccache --show-stats
-          "
+        env:
+          CCACHE_DIR: ${{ env.CCACHE_DIR }}
+          SOURCES_PATH: ${{ env.SOURCES_PATH }}
+          BASE_CACHE: ${{ env.BASE_CACHE }}
+        run: nix develop .#depends --command ./scripts/build-depends.sh
