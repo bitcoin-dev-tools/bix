@@ -37,7 +37,7 @@
               wrapProgram $out/bin/clang-tidy-diff \
                 --prefix PATH : ${
                   lib.makeBinPath [
-                    pkgs.clang-tools
+                    llvmPackages.clang-tools
                     pythonEnv
                   ]
                 }
@@ -93,7 +93,7 @@
         nativeBuildInputs = [
           pkgs.bison
           pkgs.ccache
-          pkgs.clang-tools
+          llvmPackages.clang-tools
           pkgs.cmakeCurses
           pkgs.curlMinimal
           pkgs.ninja
