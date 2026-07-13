@@ -27,10 +27,6 @@ jobs:
             runner_label: ubuntu-24.04-arm
             cores: 4
             cmake_flags:
-          - system: x86_64-darwin
-            runner_label: macos-latest
-            cores: 3
-            cmake_flags: -DWITH_USDT=OFF
           - system: aarch64-darwin
             runner_label: macos-latest
             cores: 3
