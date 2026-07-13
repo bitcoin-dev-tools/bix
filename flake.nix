@@ -60,13 +60,13 @@
           let
             llvmStdenv =
               if isLinux then
-                llvmPackages.stdenv.override {
-                  cc = llvmPackages.stdenv.cc.override {
+                llvmPackages.libcxxStdenv.override {
+                  cc = llvmPackages.libcxxStdenv.cc.override {
                     bintools = llvmPackages.bintools;
                   };
                 }
               else
-                llvmPackages.stdenv;
+                llvmPackages.libcxxStdenv;
           in
           let
             moldStdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker llvmStdenv else llvmStdenv;
