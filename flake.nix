@@ -12,152 +12,154 @@
       flake-utils,
       ...
     }:
-    flake-utils.lib.eachSystem [
-      "x86_64-linux"
-      "aarch64-linux"
-      "aarch64-darwin"
-    ] (
-      system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-        };
-        inherit (pkgs) lib;
-        inherit (pkgs.stdenv) isLinux isDarwin;
+    flake-utils.lib.eachSystem
+      [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ]
+      (
+        system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+          };
+          inherit (pkgs) lib;
+          inherit (pkgs.stdenv) isLinux isDarwin;
 
-        python = pkgs.python313;
-        llvmPackages = pkgs.llvmPackages_latest;
+          python = pkgs.python313;
+          llvmPackages = pkgs.llvmPackages_latest;
 
-        clang-tidy-diff =
-          pkgs.runCommand "clang-tidy-diff"
-            {
-              nativeBuildInputs = [ pkgs.makeWrapper ];
-            }
-            ''
-              mkdir -p $out/bin
-              cp ${llvmPackages.clang-unwrapped.src}/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py \
-                $out/bin/clang-tidy-diff
-              chmod +x $out/bin/clang-tidy-diff
-              wrapProgram $out/bin/clang-tidy-diff \
-                --prefix PATH : ${
-                  lib.makeBinPath [
-                    llvmPackages.clang-tools
-                    pythonEnv
-                  ]
-                }
-            '';
+          clang-tidy-diff =
+            pkgs.runCommand "clang-tidy-diff"
+              {
+                nativeBuildInputs = [ pkgs.makeWrapper ];
+              }
+              ''
+                mkdir -p $out/bin
+                cp ${llvmPackages.clang-unwrapped.src}/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py \
+                  $out/bin/clang-tidy-diff
+                chmod +x $out/bin/clang-tidy-diff
+                wrapProgram $out/bin/clang-tidy-diff \
+                  --prefix PATH : ${
+                    lib.makeBinPath [
+                      llvmPackages.clang-tools
+                      pythonEnv
+                    ]
+                  }
+              '';
 
-        patchelf-releases = pkgs.writeShellApplication {
-          name = "patchelf-releases";
-          runtimeInputs = with pkgs; [
-            patchelf
-            file
-            findutils
-            gnugrep
-          ];
-          text = builtins.replaceStrings [ "@interp@" ] [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" ] (
-            builtins.readFile ./scripts/patchelf-releases.sh
-          );
-        };
+          patchelf-releases = pkgs.writeShellApplication {
+            name = "patchelf-releases";
+            runtimeInputs = with pkgs; [
+              patchelf
+              file
+              findutils
+              gnugrep
+            ];
+            text = builtins.replaceStrings [ "@interp@" ] [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" ] (
+              builtins.readFile ./scripts/patchelf-releases.sh
+            );
+          };
 
-        stdEnv =
-          let
-            llvmStdenv =
-              if isLinux then
-                llvmPackages.libcxxStdenv.override {
-                  cc = llvmPackages.libcxxStdenv.cc.override {
-                    bintools = llvmPackages.bintools;
-                  };
-                }
-              else
-                llvmPackages.libcxxStdenv;
-          in
-          let
-            moldStdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker llvmStdenv else llvmStdenv;
-          in
-          pkgs.ccacheStdenv.override { stdenv = moldStdenv; };
+          stdEnv =
+            let
+              llvmStdenv =
+                if isLinux then
+                  llvmPackages.libcxxStdenv.override {
+                    cc = llvmPackages.libcxxStdenv.cc.override {
+                      bintools = llvmPackages.bintools;
+                    };
+                  }
+                else
+                  llvmPackages.libcxxStdenv;
+            in
+            let
+              moldStdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker llvmStdenv else llvmStdenv;
+            in
+            pkgs.ccacheStdenv.override { stdenv = moldStdenv; };
 
-        pythonEnv = python.withPackages (
-          ps:
-          with ps;
-          [
-            flake8
-            lief
-            matplotlib
-            mypy
-            pyzmq
-            pycapnp
-            requests
-          ]
-          ++ lib.optionals isLinux [
-            bcc
-          ]
-        );
-
-        # Will only exist in the build environment
-        nativeBuildInputs = [
-          pkgs.bison
-          pkgs.ccache
-          llvmPackages.clang-tools
-          pkgs.cmakeCurses
-          pkgs.curlMinimal
-          pkgs.ninja
-          pkgs.pkg-config
-          pkgs.xz
-        ]
-        ++ lib.optionals isLinux [
-          pkgs.libsystemtap
-          pkgs.linuxPackages.bcc
-          pkgs.linuxPackages.bpftrace
-        ];
-
-        # Will exist in the runtime environment
-        buildInputs = [
-          pkgs.boost
-          pkgs.capnproto
-          pkgs.libevent
-          pkgs.sqlite.dev
-          pkgs.zeromq
-        ];
-
-        mkDevShell =
-          nativeInputs: buildInputs:
-          (pkgs.mkShell.override { stdenv = stdEnv; }) {
-            nativeBuildInputs = nativeInputs;
-            inherit buildInputs;
-            hardeningDisable = lib.optionals isDarwin [ "stackclashprotection" ];
-            packages = [
-              clang-tidy-diff
-              pkgs.codespell
-              pkgs.doxygen
-              pkgs.graphviz
-              pkgs.hexdump
-              pkgs.include-what-you-use
-              pkgs.ruff
-              pkgs.ty
-              pythonEnv
+          pythonEnv = python.withPackages (
+            ps:
+            with ps;
+            [
+              flake8
+              lief
+              matplotlib
+              mypy
+              pyzmq
+              pycapnp
+              requests
             ]
             ++ lib.optionals isLinux [
-              patchelf-releases
-              pkgs.gdb
-              pkgs.valgrind
+              bcc
             ]
-            ++ lib.optionals isDarwin [ llvmPackages.lldb ];
+          );
 
-            CMAKE_GENERATOR = "Ninja";
-            CMAKE_EXPORT_COMPILE_COMMANDS = 1;
-            LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
-            LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
-            # Force depends capnp to also use clang, otherwise it fails when
-            # looking for the default (gcc/g++)
-            build_CC = "clang";
-            build_CXX = "clang++";
-          };
-      in
-      {
-        devShells.default = mkDevShell nativeBuildInputs buildInputs;
-        devShells.depends = mkDevShell nativeBuildInputs [ ];
-        formatter = pkgs.nixfmt-tree;
-      }
-    );
+          # Will only exist in the build environment
+          nativeBuildInputs = [
+            pkgs.bison
+            pkgs.ccache
+            llvmPackages.clang-tools
+            pkgs.cmakeCurses
+            pkgs.curlMinimal
+            pkgs.ninja
+            pkgs.pkg-config
+            pkgs.xz
+          ]
+          ++ lib.optionals isLinux [
+            pkgs.libsystemtap
+            pkgs.linuxPackages.bcc
+            pkgs.linuxPackages.bpftrace
+          ];
+
+          # Will exist in the runtime environment
+          buildInputs = [
+            pkgs.boost
+            pkgs.capnproto
+            pkgs.libevent
+            pkgs.sqlite.dev
+            pkgs.zeromq
+          ];
+
+          mkDevShell =
+            nativeInputs: buildInputs:
+            (pkgs.mkShell.override { stdenv = stdEnv; }) {
+              nativeBuildInputs = nativeInputs;
+              inherit buildInputs;
+              hardeningDisable = lib.optionals isDarwin [ "stackclashprotection" ];
+              packages = [
+                clang-tidy-diff
+                pkgs.codespell
+                pkgs.doxygen
+                pkgs.graphviz
+                pkgs.hexdump
+                pkgs.include-what-you-use
+                pkgs.ruff
+                pkgs.ty
+                pythonEnv
+              ]
+              ++ lib.optionals isLinux [
+                patchelf-releases
+                pkgs.gdb
+                pkgs.valgrind
+              ]
+              ++ lib.optionals isDarwin [ llvmPackages.lldb ];
+
+              CMAKE_GENERATOR = "Ninja";
+              CMAKE_EXPORT_COMPILE_COMMANDS = 1;
+              LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
+              LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
+              # Force depends capnp to also use clang, otherwise it fails when
+              # looking for the default (gcc/g++)
+              build_CC = "clang";
+              build_CXX = "clang++";
+            };
+        in
+        {
+          devShells.default = mkDevShell nativeBuildInputs buildInputs;
+          devShells.depends = mkDevShell nativeBuildInputs [ ];
+          formatter = pkgs.nixfmt-tree;
+        }
+      );
 }
