@@ -6,7 +6,7 @@ This flake is designed primarily as a `devShell` rather than for building a spec
 
 - All dependencies from nixpkgs needed to build all Bitcoin Core modules
 - Modern LLVM toolchain
-- Cross-platform support (Linux and MacOS x64 + aarch64)
+- Cross-platform support (Linux and MacOS)
 
 ## Features
 
@@ -89,7 +89,6 @@ cmake --build build -j$(nproc)
 |----------|--------------|-------|---------|
 | Linux    | x86_64       | ✅    | ✅      |
 | Linux    | aarch64      | ✅    | ✅      |
-| MacOS    | x86_64       | ✅    | ❌      |
 | MacOS    | aarch64      | ✅    | ❌      |
 
 ## Environment Variables
