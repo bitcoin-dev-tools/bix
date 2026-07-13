@@ -79,6 +79,7 @@
           [
             flake8
             lief
+            matplotlib
             mypy
             pyzmq
             pycapnp
@@ -125,6 +126,7 @@
               clang-tidy-diff
               pkgs.codespell
               pkgs.doxygen
+              pkgs.graphviz
               pkgs.hexdump
               pkgs.include-what-you-use
               pkgs.ruff
