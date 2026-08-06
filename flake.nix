@@ -50,9 +50,27 @@
               llvmPackages_22 = patchLlvmPackages prev.llvmPackages_22;
               llvmPackages_latest = final.llvmPackages_22;
             };
+
+          # Temporary overlay until nixpkgs merges:
+          # https://github.com/NixOS/nixpkgs/pull/541600
+          capnproto150Overlay = final: prev: {
+            capnproto = prev.capnproto.overrideAttrs (oldAttrs: rec {
+              version = "1.5.0";
+              src = prev.fetchFromGitHub {
+                owner = "capnproto";
+                repo = "capnproto";
+                rev = "v${version}";
+                hash = "sha256-2J3FYwPAtbahHI1y1KMqU8Gn2YlKyIW8kZIJz2Ja31w=";
+              };
+            });
+          };
+
           pkgs = import nixpkgs {
             inherit system;
-            overlays = [ compilerRtNoLibcAarch64LinuxOverlay ];
+            overlays = [
+              compilerRtNoLibcAarch64LinuxOverlay
+              capnproto150Overlay
+            ];
           };
           inherit (pkgs) lib;
           inherit (pkgs.stdenv) isLinux isDarwin;
