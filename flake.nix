@@ -21,55 +21,11 @@
       (
         system:
         let
-          compilerRtNoLibcAarch64LinuxOverlay =
-            final: prev:
-            let
-              patchLlvmPackages =
-                llvmPackages:
-                llvmPackages.overrideScope (
-                  llvmFinal: llvmPrev: {
-                    compiler-rt-no-libc = llvmPrev.compiler-rt-no-libc.overrideAttrs (oldAttrs: {
-                      postPatch =
-                        (oldAttrs.postPatch or "")
-                        +
-                          final.lib.optionalString (prev.stdenv.hostPlatform.isLinux && prev.stdenv.hostPlatform.isAarch64)
-                            ''
-                              # PR #409265 disables AArch64 FMV for no-libc compiler-rt
-                              # builds, but LLVM 22 still includes sys/auxv.h for LSE atomics.
-                              # https://github.com/NixOS/nixpkgs/pull/409265
-                              # https://github.com/NixOS/nixpkgs/issues/393603
-                              substituteInPlace lib/builtins/cpu_model/aarch64.c \
-                                --replace-fail '#elif defined(__linux__)' \
-                                               '#elif defined(__linux__) && __has_include(<sys/auxv.h>)'
-                            '';
-                    });
-                  }
-                );
-            in
-            {
-              llvmPackages_22 = patchLlvmPackages prev.llvmPackages_22;
-              llvmPackages_latest = final.llvmPackages_22;
-            };
-
-          # Temporary overlay until nixpkgs merges:
-          # https://github.com/NixOS/nixpkgs/pull/541600
-          capnproto150Overlay = final: prev: {
-            capnproto = prev.capnproto.overrideAttrs (oldAttrs: rec {
-              version = "1.5.0";
-              src = prev.fetchFromGitHub {
-                owner = "capnproto";
-                repo = "capnproto";
-                rev = "v${version}";
-                hash = "sha256-2J3FYwPAtbahHI1y1KMqU8Gn2YlKyIW8kZIJz2Ja31w=";
-              };
-            });
-          };
-
           pkgs = import nixpkgs {
             inherit system;
             overlays = [
-              compilerRtNoLibcAarch64LinuxOverlay
-              capnproto150Overlay
+              (import ./overlays/compiler-rt-no-libc-aarch64-linux.nix)
+              (import ./overlays/capnproto-1.5.0.nix)
             ];
           };
           inherit (pkgs) lib;
