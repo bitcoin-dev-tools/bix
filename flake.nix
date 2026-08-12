@@ -3,22 +3,21 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs =
     {
       nixpkgs,
-      flake-utils,
       ...
     }:
-    flake-utils.lib.eachSystem
-      [
+    let
+      systems = [
         "x86_64-linux"
         "aarch64-linux"
         "aarch64-darwin"
-      ]
-      (
+      ];
+      forAllSystems = nixpkgs.lib.genAttrs systems;
+      systemOutputs = forAllSystems (
         system:
         let
           pkgs = import nixpkgs {
@@ -143,4 +142,9 @@
           formatter = pkgs.nixfmt-tree;
         }
       );
+    in
+    {
+      devShells = nixpkgs.lib.mapAttrs (_: output: output.devShells) systemOutputs;
+      formatter = nixpkgs.lib.mapAttrs (_: output: output.formatter) systemOutputs;
+    };
 }
