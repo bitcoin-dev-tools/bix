@@ -61,7 +61,7 @@
               findutils
               gnugrep
             ];
-            text = builtins.replaceStrings [ "@interp@" ] [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" ] (
+            text = builtins.replaceStrings [ "@interp@" ] [ pkgs.stdenv.cc.bintools.dynamicLinker ] (
               builtins.readFile ./scripts/patchelf-releases.sh
             );
           };
