@@ -86,7 +86,6 @@
           commonNativeBuildInputs = [
             pkgs.bison
             pkgs.ccache
-            llvmPackages.clang-tools
             pkgs.cmakeCurses
             pkgs.curlMinimal
             pkgs.ninja
@@ -136,18 +135,17 @@
               extraNativeBuildInputs ? [ ],
               extraBuildInputs ? [ ],
               extraEnvironment ? { },
+              extraPackages ? [ ],
             }:
             (pkgs.mkShell.override { inherit stdenv; }) {
               nativeBuildInputs = commonNativeBuildInputs ++ extraNativeBuildInputs;
               buildInputs = buildInputs ++ extraBuildInputs;
               hardeningDisable = lib.optionals isDarwin [ "stackclashprotection" ];
               packages = [
-                tools.clang-tidy-diff
                 pkgs.codespell
                 pkgs.doxygen
                 pkgs.graphviz
                 pkgs.hexdump
-                pkgs.include-what-you-use
                 pkgs.ruff
                 pkgs.ty
                 pythonEnv
@@ -157,7 +155,8 @@
                 pkgs.gdb
                 pkgs.valgrind
               ]
-              ++ lib.optionals isDarwin [ llvmPackages.lldb ];
+              ++ lib.optionals isDarwin [ llvmPackages.lldb ]
+              ++ extraPackages;
 
               CMAKE_GENERATOR = "Ninja";
               CMAKE_EXPORT_COMPILE_COMMANDS = 1;
@@ -176,8 +175,15 @@
             default = gcc;
             clang = mkDevShell {
               stdenv = clangStdenv;
-              extraNativeBuildInputs = [ pkgs.qt6.wrapQtAppsHook ];
+              extraNativeBuildInputs = [
+                pkgs.qt6.wrapQtAppsHook
+                llvmPackages.clang-tools
+              ];
               extraBuildInputs = qtBuildInputs;
+              extraPackages = [
+                tools.clang-tidy-diff
+                pkgs.include-what-you-use
+              ];
               extraEnvironment = {
                 # Keep depends' native build tools on the Clang toolchain.
                 build_CC = "clang";
