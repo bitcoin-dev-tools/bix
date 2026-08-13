@@ -1,7 +1,6 @@
 {
   pkgs,
   lib,
-  llvmPackages,
   pythonEnv,
 }:
 {
@@ -12,13 +11,13 @@
       }
       ''
         mkdir -p $out/bin
-        cp ${llvmPackages.clang-unwrapped.src}/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py \
+        cp ${pkgs.llvmPackages.clang-unwrapped.src}/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py \
           $out/bin/clang-tidy-diff
         chmod +x $out/bin/clang-tidy-diff
         wrapProgram $out/bin/clang-tidy-diff \
           --prefix PATH : ${
             lib.makeBinPath [
-              llvmPackages.clang-tools
+              pkgs.llvmPackages.clang-tools
               pythonEnv
             ]
           }

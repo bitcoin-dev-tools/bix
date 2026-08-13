@@ -31,22 +31,10 @@
           inherit (pkgs.stdenv) isLinux isDarwin;
 
           python = pkgs.python313;
-          llvmPackages = pkgs.llvmPackages_latest;
 
           stdEnv =
             let
-              llvmStdenv =
-                if isLinux then
-                  llvmPackages.libcxxStdenv.override {
-                    cc = llvmPackages.libcxxStdenv.cc.override {
-                      bintools = llvmPackages.bintools;
-                    };
-                  }
-                else
-                  llvmPackages.libcxxStdenv;
-            in
-            let
-              moldStdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker llvmStdenv else llvmStdenv;
+              moldStdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv else pkgs.stdenv;
             in
             pkgs.ccacheStdenv.override { stdenv = moldStdenv; };
 
@@ -70,7 +58,6 @@
           tools = import ./tools/tools.nix {
             inherit
               lib
-              llvmPackages
               pkgs
               pythonEnv
               ;
@@ -80,7 +67,7 @@
           nativeBuildInputs = [
             pkgs.bison
             pkgs.ccache
-            llvmPackages.clang-tools
+            pkgs.clang-tools
             pkgs.cmakeCurses
             pkgs.curlMinimal
             pkgs.ninja
@@ -129,17 +116,13 @@
                 pkgs.gdb
                 pkgs.valgrind
               ]
-              ++ lib.optionals isDarwin [ llvmPackages.lldb ];
+              ++ lib.optionals isDarwin [ pkgs.lldb ];
 
               CMAKE_GENERATOR = "Ninja";
               CMAKE_EXPORT_COMPILE_COMMANDS = 1;
               LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
               LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
               QT_PLUGIN_PATH = "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}";
-              # Force depends capnp to also use clang, otherwise it fails when
-              # looking for the default (gcc/g++)
-              build_CC = "clang";
-              build_CXX = "clang++";
             };
         in
         {
