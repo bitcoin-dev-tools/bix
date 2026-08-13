@@ -23,7 +23,6 @@ The GCC shell uses a slightly opinionated build system:
 
 The nixpkgs-backed shells provide Bitcoin Core dependencies such as:
 - Boost
-- libevent
 - SQLite
 - ZeroMQ
 - Cap'n Proto
