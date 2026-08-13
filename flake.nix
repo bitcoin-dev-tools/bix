@@ -32,11 +32,29 @@
 
           python = pkgs.python313;
 
-          stdEnv =
+          llvmPackages = pkgs.llvmPackages_latest;
+
+          mkStdenv =
+            stdenv:
+            pkgs.ccacheStdenv.override {
+              stdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker stdenv else stdenv;
+            };
+
+          gccStdenv = mkStdenv pkgs.stdenv;
+
+          clangStdenv =
             let
-              moldStdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv else pkgs.stdenv;
+              stdenv =
+                if isLinux then
+                  llvmPackages.libcxxStdenv.override {
+                    cc = llvmPackages.libcxxStdenv.cc.override {
+                      bintools = llvmPackages.bintools;
+                    };
+                  }
+                else
+                  llvmPackages.libcxxStdenv;
             in
-            pkgs.ccacheStdenv.override { stdenv = moldStdenv; };
+            mkStdenv stdenv;
 
           pythonEnv = python.withPackages (
             ps:
@@ -58,21 +76,21 @@
           tools = import ./tools/tools.nix {
             inherit
               lib
+              llvmPackages
               pkgs
               pythonEnv
               ;
           };
 
-          # programs/hooks executed on the build machine
-          nativeBuildInputs = [
+          # Programs and hooks shared by all shells, executed on the build machine.
+          commonNativeBuildInputs = [
             pkgs.bison
             pkgs.ccache
-            pkgs.clang-tools
+            llvmPackages.clang-tools
             pkgs.cmakeCurses
             pkgs.curlMinimal
             pkgs.ninja
             pkgs.pkg-config
-            pkgs.qt6.wrapQtAppsHook
             pkgs.xz
           ]
           ++ lib.optionals isLinux [
@@ -80,13 +98,10 @@
             pkgs.linuxPackages.bpftrace
           ];
 
-          # headers and libraries compiled or linked for the target machine
-          buildInputs = [
+          # Headers and libraries shared by shells using nixpkgs dependencies.
+          commonBuildInputs = [
             pkgs.boost
             pkgs.capnproto
-            pkgs.qrencode
-            pkgs.qt6.qtbase
-            pkgs.qt6.qttools
             pkgs.sqlite.dev
             pkgs.zeromq
           ]
@@ -94,11 +109,23 @@
             pkgs.libsystemtap
           ];
 
+          qtBuildInputs = [
+            pkgs.qrencode
+            pkgs.qt6.qtbase
+            pkgs.qt6.qttools
+          ];
+
           mkDevShell =
-            nativeInputs: buildInputs:
-            (pkgs.mkShell.override { stdenv = stdEnv; }) {
-              nativeBuildInputs = nativeInputs;
-              inherit buildInputs;
+            {
+              stdenv ? gccStdenv,
+              buildInputs ? commonBuildInputs,
+              extraNativeBuildInputs ? [ ],
+              extraBuildInputs ? [ ],
+              extraEnvironment ? { },
+            }:
+            (pkgs.mkShell.override { inherit stdenv; }) {
+              nativeBuildInputs = commonNativeBuildInputs ++ extraNativeBuildInputs;
+              buildInputs = buildInputs ++ extraBuildInputs;
               hardeningDisable = lib.optionals isDarwin [ "stackclashprotection" ];
               packages = [
                 tools.clang-tidy-diff
@@ -116,18 +143,37 @@
                 pkgs.gdb
                 pkgs.valgrind
               ]
-              ++ lib.optionals isDarwin [ pkgs.lldb ];
+              ++ lib.optionals isDarwin [ llvmPackages.lldb ];
 
               CMAKE_GENERATOR = "Ninja";
               CMAKE_EXPORT_COMPILE_COMMANDS = 1;
               LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
               LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
-              QT_PLUGIN_PATH = "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}";
-            };
+            }
+            // extraEnvironment;
         in
         {
-          devShells.default = mkDevShell nativeBuildInputs buildInputs;
-          devShells.depends = mkDevShell nativeBuildInputs [ ];
+          devShells = rec {
+            gcc = mkDevShell {
+              extraNativeBuildInputs = [ pkgs.qt6.wrapQtAppsHook ];
+              extraBuildInputs = qtBuildInputs;
+              extraEnvironment = {
+                QT_PLUGIN_PATH = "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}";
+              };
+            };
+            default = gcc;
+            clang = mkDevShell {
+              stdenv = clangStdenv;
+              extraEnvironment = {
+                # Keep depends' native build tools on the Clang toolchain.
+                build_CC = "clang";
+                build_CXX = "clang++";
+              };
+            };
+            depends = mkDevShell {
+              buildInputs = [ ];
+            };
+          };
           formatter = pkgs.nixfmt-tree;
         }
       );
