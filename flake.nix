@@ -76,7 +76,7 @@
               ;
           };
 
-          # Will only exist in the build environment
+          # programs/hooks executed on the build machine
           nativeBuildInputs = [
             pkgs.bison
             pkgs.ccache
@@ -85,21 +85,26 @@
             pkgs.curlMinimal
             pkgs.ninja
             pkgs.pkg-config
+            pkgs.qt6.wrapQtAppsHook
             pkgs.xz
           ]
           ++ lib.optionals isLinux [
-            pkgs.libsystemtap
             pkgs.linuxPackages.bcc
             pkgs.linuxPackages.bpftrace
           ];
 
-          # Will exist in the runtime environment
+          # headers and libraries compiled or linked for the target machine
           buildInputs = [
             pkgs.boost
             pkgs.capnproto
-            pkgs.libevent
+            pkgs.qrencode
+            pkgs.qt6.qtbase
+            pkgs.qt6.qttools
             pkgs.sqlite.dev
             pkgs.zeromq
+          ]
+          ++ lib.optionals isLinux [
+            pkgs.libsystemtap
           ];
 
           mkDevShell =
@@ -130,6 +135,7 @@
               CMAKE_EXPORT_COMPILE_COMMANDS = 1;
               LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
               LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
+              QT_PLUGIN_PATH = "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}";
               # Force depends capnp to also use clang, otherwise it fails when
               # looking for the default (gcc/g++)
               build_CC = "clang";
