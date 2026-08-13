@@ -109,11 +109,25 @@
             pkgs.libsystemtap
           ];
 
-          qtBuildInputs = [
-            pkgs.qrencode
+          qtEnv = pkgs.qt6.env "bix-qt-${pkgs.qt6.qtbase.version}" [
             pkgs.qt6.qtbase
             pkgs.qt6.qttools
           ];
+
+          qtBuildInputs = [
+            qtEnv
+            # wrapQtAppsHook inspects qtbase directly to discover qtPluginPrefix.
+            pkgs.qt6.qtbase
+            pkgs.qrencode
+          ];
+
+          qtEnvironment = {
+            QT_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins";
+            QT_QPA_PLATFORM_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins/platforms";
+          }
+          // lib.optionalAttrs isLinux {
+            QT_QPA_PLATFORM = "wayland";
+          };
 
           mkDevShell =
             {
@@ -157,18 +171,19 @@
             gcc = mkDevShell {
               extraNativeBuildInputs = [ pkgs.qt6.wrapQtAppsHook ];
               extraBuildInputs = qtBuildInputs;
-              extraEnvironment = {
-                QT_PLUGIN_PATH = "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}";
-              };
+              extraEnvironment = qtEnvironment;
             };
             default = gcc;
             clang = mkDevShell {
               stdenv = clangStdenv;
+              extraNativeBuildInputs = [ pkgs.qt6.wrapQtAppsHook ];
+              extraBuildInputs = qtBuildInputs;
               extraEnvironment = {
                 # Keep depends' native build tools on the Clang toolchain.
                 build_CC = "clang";
                 build_CXX = "clang++";
-              };
+              }
+              // qtEnvironment;
             };
             depends = mkDevShell {
               buildInputs = [ ];
