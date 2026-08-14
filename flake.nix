@@ -3,22 +3,21 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs =
     {
       nixpkgs,
-      flake-utils,
       ...
     }:
-    flake-utils.lib.eachSystem
-      [
+    let
+      systems = [
         "x86_64-linux"
         "aarch64-linux"
         "aarch64-darwin"
-      ]
-      (
+      ];
+      forAllSystems = nixpkgs.lib.genAttrs systems;
+      systemOutputs = forAllSystems (
         system:
         let
           pkgs = import nixpkgs {
@@ -32,43 +31,20 @@
           inherit (pkgs.stdenv) isLinux isDarwin;
 
           python = pkgs.python313;
+
           llvmPackages = pkgs.llvmPackages_latest;
 
-          clang-tidy-diff =
-            pkgs.runCommand "clang-tidy-diff"
-              {
-                nativeBuildInputs = [ pkgs.makeWrapper ];
-              }
-              ''
-                mkdir -p $out/bin
-                cp ${llvmPackages.clang-unwrapped.src}/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py \
-                  $out/bin/clang-tidy-diff
-                chmod +x $out/bin/clang-tidy-diff
-                wrapProgram $out/bin/clang-tidy-diff \
-                  --prefix PATH : ${
-                    lib.makeBinPath [
-                      llvmPackages.clang-tools
-                      pythonEnv
-                    ]
-                  }
-              '';
+          mkStdenv =
+            stdenv:
+            pkgs.ccacheStdenv.override {
+              stdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker stdenv else stdenv;
+            };
 
-          patchelf-releases = pkgs.writeShellApplication {
-            name = "patchelf-releases";
-            runtimeInputs = with pkgs; [
-              patchelf
-              file
-              findutils
-              gnugrep
-            ];
-            text = builtins.replaceStrings [ "@interp@" ] [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" ] (
-              builtins.readFile ./scripts/patchelf-releases.sh
-            );
-          };
+          gccStdenv = mkStdenv pkgs.stdenv;
 
-          stdEnv =
+          clangStdenv =
             let
-              llvmStdenv =
+              stdenv =
                 if isLinux then
                   llvmPackages.libcxxStdenv.override {
                     cc = llvmPackages.libcxxStdenv.cc.override {
@@ -78,10 +54,7 @@
                 else
                   llvmPackages.libcxxStdenv;
             in
-            let
-              moldStdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker llvmStdenv else llvmStdenv;
-            in
-            pkgs.ccacheStdenv.override { stdenv = moldStdenv; };
+            mkStdenv stdenv;
 
           pythonEnv = python.withPackages (
             ps:
@@ -100,11 +73,19 @@
             ]
           );
 
-          # Will only exist in the build environment
-          nativeBuildInputs = [
+          tools = import ./tools/tools.nix {
+            inherit
+              lib
+              llvmPackages
+              pkgs
+              pythonEnv
+              ;
+          };
+
+          # Programs and hooks shared by all shells, executed on the build machine.
+          commonNativeBuildInputs = [
             pkgs.bison
             pkgs.ccache
-            llvmPackages.clang-tools
             pkgs.cmakeCurses
             pkgs.curlMinimal
             pkgs.ninja
@@ -112,58 +93,114 @@
             pkgs.xz
           ]
           ++ lib.optionals isLinux [
-            pkgs.libsystemtap
             pkgs.linuxPackages.bcc
             pkgs.linuxPackages.bpftrace
           ];
 
-          # Will exist in the runtime environment
-          buildInputs = [
+          # Headers and libraries shared by shells using nixpkgs dependencies.
+          commonBuildInputs = [
             pkgs.boost
             pkgs.capnproto
-            pkgs.libevent
             pkgs.sqlite.dev
             pkgs.zeromq
+          ]
+          ++ lib.optionals isLinux [
+            pkgs.libsystemtap
           ];
 
+          qtEnv = pkgs.qt6.env "bix-qt-${pkgs.qt6.qtbase.version}" [
+            pkgs.qt6.qtbase
+            pkgs.qt6.qttools
+          ];
+
+          qtBuildInputs = [
+            qtEnv
+            # wrapQtAppsHook inspects qtbase directly to discover qtPluginPrefix.
+            pkgs.qt6.qtbase
+            pkgs.qrencode
+          ];
+
+          qtEnvironment = {
+            QT_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins";
+            QT_QPA_PLATFORM_PLUGIN_PATH = "${qtEnv}/lib/qt-6/plugins/platforms";
+          }
+          // lib.optionalAttrs isLinux {
+            QT_QPA_PLATFORM = "wayland";
+          };
+
           mkDevShell =
-            nativeInputs: buildInputs:
-            (pkgs.mkShell.override { stdenv = stdEnv; }) {
-              nativeBuildInputs = nativeInputs;
-              inherit buildInputs;
+            {
+              stdenv ? gccStdenv,
+              buildInputs ? commonBuildInputs,
+              extraNativeBuildInputs ? [ ],
+              extraBuildInputs ? [ ],
+              extraEnvironment ? { },
+              extraPackages ? [ ],
+            }:
+            (pkgs.mkShell.override { inherit stdenv; }) {
+              nativeBuildInputs = commonNativeBuildInputs ++ extraNativeBuildInputs;
+              buildInputs = buildInputs ++ extraBuildInputs;
               hardeningDisable = lib.optionals isDarwin [ "stackclashprotection" ];
               packages = [
-                clang-tidy-diff
                 pkgs.codespell
                 pkgs.doxygen
                 pkgs.graphviz
                 pkgs.hexdump
-                pkgs.include-what-you-use
                 pkgs.ruff
                 pkgs.ty
                 pythonEnv
               ]
               ++ lib.optionals isLinux [
-                patchelf-releases
+                tools.patchelf-releases
                 pkgs.gdb
                 pkgs.valgrind
               ]
-              ++ lib.optionals isDarwin [ llvmPackages.lldb ];
+              ++ lib.optionals isDarwin [ llvmPackages.lldb ]
+              ++ extraPackages;
 
               CMAKE_GENERATOR = "Ninja";
               CMAKE_EXPORT_COMPILE_COMMANDS = 1;
               LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
               LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
-              # Force depends capnp to also use clang, otherwise it fails when
-              # looking for the default (gcc/g++)
-              build_CC = "clang";
-              build_CXX = "clang++";
-            };
+            }
+            // extraEnvironment;
         in
         {
-          devShells.default = mkDevShell nativeBuildInputs buildInputs;
-          devShells.depends = mkDevShell nativeBuildInputs [ ];
+          devShells = rec {
+            gcc = mkDevShell {
+              extraNativeBuildInputs = [ pkgs.qt6.wrapQtAppsHook ];
+              extraBuildInputs = qtBuildInputs;
+              extraEnvironment = qtEnvironment;
+            };
+            default = gcc;
+            clang = mkDevShell {
+              stdenv = clangStdenv;
+              extraNativeBuildInputs = [
+                pkgs.qt6.wrapQtAppsHook
+                llvmPackages.clang-tools
+              ];
+              extraBuildInputs = qtBuildInputs;
+              extraPackages = [
+                tools.clang-tidy-diff
+                pkgs.include-what-you-use
+              ];
+              extraEnvironment = {
+                # Keep depends' native build tools on the Clang toolchain.
+                build_CC = "clang";
+                build_CXX = "clang++";
+              }
+              // qtEnvironment;
+            };
+            depends = mkDevShell {
+              buildInputs = [ ];
+            };
+          };
           formatter = pkgs.nixfmt-tree;
         }
       );
+    in
+    {
+      devShells = nixpkgs.lib.mapAttrs (_: output: output.devShells) systemOutputs;
+      formatter = nixpkgs.lib.mapAttrs (_: output: output.formatter) systemOutputs;
+    };
 }

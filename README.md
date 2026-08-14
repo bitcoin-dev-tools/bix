@@ -2,27 +2,27 @@
 
 ## Overview
 
-This flake is designed primarily as a `devShell` rather than for building a specific derivation. It provides:
+This flake is designed primarily as `devShell`s rather than for building a specific derivation. It provides:
 
-- All dependencies from nixpkgs needed to build all Bitcoin Core modules
-- Modern LLVM toolchain
+- `gcc` (the default shell): GCC, Qt, and nixpkgs dependencies
+- `clang`: Clang with non-Qt nixpkgs dependencies
+- `depends`: build tools only; dependencies are built by Bitcoin Core's depends system
 - Cross-platform support (Linux and MacOS)
 
 ## Features
 
 ### Build System
 
-We use a slightly opinionated Clang/LLVM-based build system:
+The GCC shell uses a slightly opinionated build system:
 
 - CMake + Ninja - Fast, parallel builds
-- LLVM/Clang 20 toolchain
+- GCC and mold on Linux
 - ccache
 
 ### Dependencies
 
-All Bitcoin Core dependencies from nixpkgs:
+The nixpkgs-backed shells provide Bitcoin Core dependencies such as:
 - Boost
-- libevent
 - SQLite
 - ZeroMQ
 - Cap'n Proto
@@ -47,6 +47,10 @@ All Bitcoin Core dependencies from nixpkgs:
 
 ```bash
 nix develop
+# or explicitly:
+nix develop .#gcc
+nix develop .#clang
+nix develop .#depends
 ```
 
 ### Build Bitcoin Core
@@ -97,6 +101,7 @@ The shell automatically sets:
 - `CMAKE_GENERATOR=Ninja` - Use Ninja build system
 - `LD_LIBRARY_PATH` - Includes Cap'n Proto libraries
 - `LOCALE_ARCHIVE` - Proper locale support (Linux)
+- `QT_PLUGIN_PATH` - Qt plugin location in the GCC shell
 
 ## Requirements
 
