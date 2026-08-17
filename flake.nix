@@ -136,6 +136,7 @@
               extraBuildInputs ? [ ],
               extraEnvironment ? { },
               extraPackages ? [ ],
+              nativeOptimization ? false,
             }:
             (pkgs.mkShell.override { inherit stdenv; }) {
               nativeBuildInputs = commonNativeBuildInputs ++ extraNativeBuildInputs;
@@ -162,18 +163,24 @@
               CMAKE_EXPORT_COMPILE_COMMANDS = 1;
               LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
               LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
+
+              shellHook = lib.optionalString nativeOptimization ''
+                export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -march=native"
+              '';
             }
             // extraEnvironment;
         in
         {
           devShells = rec {
             gcc = mkDevShell {
+              nativeOptimization = true;
               extraNativeBuildInputs = [ pkgs.qt6.wrapQtAppsHook ];
               extraBuildInputs = qtBuildInputs;
               extraEnvironment = qtEnvironment;
             };
             default = gcc;
             clang = mkDevShell {
+              nativeOptimization = true;
               stdenv = clangStdenv;
               extraNativeBuildInputs = [
                 pkgs.qt6.wrapQtAppsHook
