@@ -32,7 +32,7 @@
 
           python = pkgs.python313;
 
-          llvmPackages = pkgs.llvmPackages_latest;
+          llvmPackages = pkgs.llvmPackages_23;
 
           mkStdenv =
             stdenv:
