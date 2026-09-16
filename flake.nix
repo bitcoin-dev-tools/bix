@@ -42,19 +42,13 @@
 
           gccStdenv = mkStdenv pkgs.stdenv;
 
-          clangStdenv =
-            let
-              stdenv =
-                if isLinux then
-                  llvmPackages.libcxxStdenv.override {
-                    cc = llvmPackages.libcxxStdenv.cc.override {
-                      bintools = llvmPackages.bintools;
-                    };
-                  }
-                else
-                  llvmPackages.libcxxStdenv;
-            in
-            mkStdenv stdenv;
+          clangStdenv = mkStdenv (
+            llvmPackages.libcxxStdenv.override {
+              cc = llvmPackages.libcxxStdenv.cc.override {
+                bintools = llvmPackages.bintools;
+              };
+            }
+          );
 
           pythonEnv = python.withPackages (
             ps:
