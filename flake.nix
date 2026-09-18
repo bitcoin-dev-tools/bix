@@ -153,7 +153,6 @@
                 pkgs.gdb
                 pkgs.valgrind
               ]
-              ++ lib.optionals isDarwin [ llvmPackages.lldb ]
               ++ extraPackages;
 
               CMAKE_GENERATOR = "Ninja";
