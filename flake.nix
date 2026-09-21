@@ -28,7 +28,7 @@
             ];
           };
           inherit (pkgs) lib;
-          inherit (pkgs.stdenv) isLinux isDarwin;
+          inherit (pkgs.stdenv.hostPlatform) isLinux isDarwin;
 
           python = pkgs.python313;
 
