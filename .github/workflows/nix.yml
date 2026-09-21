@@ -1,4 +1,4 @@
-name: Build from nixpkgs
+name: Build with Bix
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   check:
-    name: nixpkgs (${{ matrix.system }})
+    name: Bix default (${{ matrix.system }}, ${{ matrix.compiler }})
     runs-on: ${{ matrix.runner_label }}
 
     permissions:
@@ -21,14 +21,17 @@ jobs:
         include:
           - system: x86_64-linux
             runner_label: ubuntu-latest
+            compiler: GCC
             cores: 4
             cmake_flags:
           - system: aarch64-linux
             runner_label: ubuntu-24.04-arm
+            compiler: GCC
             cores: 4
             cmake_flags:
           - system: aarch64-darwin
             runner_label: macos-latest
+            compiler: nixpkgs Clang
             cores: 3
             cmake_flags: -DWITH_USDT=OFF
 
