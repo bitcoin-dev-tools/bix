@@ -32,7 +32,7 @@
 
           python = pkgs.python313;
 
-          llvmPackages = pkgs.llvmPackages_latest;
+          llvmPackages = pkgs.llvmPackages_23;
 
           mkStdenv =
             stdenv:
@@ -42,19 +42,16 @@
 
           gccStdenv = mkStdenv pkgs.stdenv;
 
-          clangStdenv =
-            let
-              stdenv =
-                if isLinux then
-                  llvmPackages.libcxxStdenv.override {
-                    cc = llvmPackages.libcxxStdenv.cc.override {
-                      bintools = llvmPackages.bintools;
-                    };
-                  }
-                else
-                  llvmPackages.libcxxStdenv;
-            in
-            mkStdenv stdenv;
+          clangStdenv = mkStdenv (
+            if isLinux then
+              llvmPackages.libcxxStdenv.override {
+                cc = llvmPackages.libcxxStdenv.cc.override {
+                  bintools = llvmPackages.bintools;
+                };
+              }
+            else
+              llvmPackages.libcxxStdenv
+          );
 
           pythonEnv = python.withPackages (
             ps:
@@ -136,6 +133,7 @@
               extraBuildInputs ? [ ],
               extraEnvironment ? { },
               extraPackages ? [ ],
+              nativeOptimization ? false,
             }:
             (pkgs.mkShell.override { inherit stdenv; }) {
               nativeBuildInputs = commonNativeBuildInputs ++ extraNativeBuildInputs;
@@ -155,25 +153,30 @@
                 pkgs.gdb
                 pkgs.valgrind
               ]
-              ++ lib.optionals isDarwin [ llvmPackages.lldb ]
               ++ extraPackages;
 
               CMAKE_GENERATOR = "Ninja";
               CMAKE_EXPORT_COMPILE_COMMANDS = 1;
               LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.capnproto ];
               LOCALE_ARCHIVE = lib.optionalString isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
+
+              shellHook = lib.optionalString nativeOptimization ''
+                export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -march=native"
+              '';
             }
             // extraEnvironment;
         in
         {
           devShells = rec {
             gcc = mkDevShell {
+              nativeOptimization = true;
               extraNativeBuildInputs = [ pkgs.qt6.wrapQtAppsHook ];
               extraBuildInputs = qtBuildInputs;
               extraEnvironment = qtEnvironment;
             };
             default = gcc;
             clang = mkDevShell {
+              nativeOptimization = true;
               stdenv = clangStdenv;
               extraNativeBuildInputs = [
                 pkgs.qt6.wrapQtAppsHook
