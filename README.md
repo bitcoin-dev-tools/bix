@@ -4,8 +4,9 @@
 
 This flake is designed primarily as `devShell`s rather than for building a specific derivation. It provides:
 
-- `gcc` (the default shell): GCC, Qt, and nixpkgs dependencies
-- `clang`: Clang with non-Qt nixpkgs dependencies
+- `default`: nixpkgs' default compiler and dependencies (GCC on Linux, nixpkgs
+  Clang on Darwin), with Qt
+- `clang`: LLVM Clang on Linux and the nixpkgs default Clang toolchain on Darwin
 - `depends`: build tools only; dependencies are built by Bitcoin Core's depends system
 - Cross-platform support (Linux and MacOS)
 
@@ -13,10 +14,10 @@ This flake is designed primarily as `devShell`s rather than for building a speci
 
 ### Build System
 
-The GCC shell uses a slightly opinionated build system:
+The default shell uses a slightly opinionated build system:
 
 - CMake + Ninja - Fast, parallel builds
-- GCC and mold on Linux
+- GCC and mold on Linux; the nixpkgs Darwin toolchain on macOS
 - ccache
 
 ### Dependencies
@@ -33,7 +34,7 @@ The nixpkgs-backed shells provide Bitcoin Core dependencies such as:
 - Debugging: GDB (Linux) / LLDB (macOS)
 - Tracing: SystemTap, BCC, bpftrace (Linux)
 - Linting: flake8, mypy, vulture, codespell
-- Misc: `clang-format`, `clang-tidy` and friends
+- The Linux Clang shell includes `clang-format`, `clang-tidy`, and IWYU.
 
 ### Build Capabilities
 
@@ -48,7 +49,7 @@ The nixpkgs-backed shells provide Bitcoin Core dependencies such as:
 ```bash
 nix develop
 # or explicitly:
-nix develop .#gcc
+nix develop .#default
 nix develop .#clang
 nix develop .#depends
 ```
@@ -101,7 +102,7 @@ The shell automatically sets:
 - `CMAKE_GENERATOR=Ninja` - Use Ninja build system
 - `LD_LIBRARY_PATH` - Includes Cap'n Proto libraries
 - `LOCALE_ARCHIVE` - Proper locale support (Linux)
-- `QT_PLUGIN_PATH` - Qt plugin location in the GCC shell
+- `QT_PLUGIN_PATH` - Qt plugin location in the default shell
 
 ## Requirements
 
@@ -109,7 +110,7 @@ The shell automatically sets:
 
 ## Contributing
 
-This flake uses nixpkgs stable (25.05) for reproducible builds. Format code with:
+This flake uses nixpkgs unstable. Format code with:
 ```bash
 nix fmt .
 ```

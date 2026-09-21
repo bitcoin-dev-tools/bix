@@ -40,18 +40,19 @@
               stdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker stdenv else stdenv;
             };
 
-          gccStdenv = mkStdenv pkgs.stdenv;
+          defaultStdenv = mkStdenv pkgs.stdenv;
 
-          clangStdenv = mkStdenv (
+          clangStdenv =
             if isLinux then
-              llvmPackages.libcxxStdenv.override {
-                cc = llvmPackages.libcxxStdenv.cc.override {
-                  bintools = llvmPackages.bintools;
-                };
-              }
+              mkStdenv (
+                llvmPackages.libcxxStdenv.override {
+                  cc = llvmPackages.libcxxStdenv.cc.override {
+                    bintools = llvmPackages.bintools;
+                  };
+                }
+              )
             else
-              llvmPackages.libcxxStdenv
-          );
+              defaultStdenv;
 
           pythonEnv = python.withPackages (
             ps:
@@ -127,7 +128,7 @@
 
           mkDevShell =
             {
-              stdenv ? gccStdenv,
+              stdenv ? defaultStdenv,
               buildInputs ? commonBuildInputs,
               extraNativeBuildInputs ? [ ],
               extraBuildInputs ? [ ],
@@ -167,23 +168,22 @@
             // extraEnvironment;
         in
         {
-          devShells = rec {
-            gcc = mkDevShell {
+          devShells = {
+            default = mkDevShell {
               nativeOptimization = true;
               extraNativeBuildInputs = [ pkgs.qt6.wrapQtAppsHook ];
               extraBuildInputs = qtBuildInputs;
               extraEnvironment = qtEnvironment;
             };
-            default = gcc;
             clang = mkDevShell {
               nativeOptimization = true;
               stdenv = clangStdenv;
               extraNativeBuildInputs = [
                 pkgs.qt6.wrapQtAppsHook
-                llvmPackages.clang-tools
-              ];
+              ]
+              ++ lib.optionals isLinux [ llvmPackages.clang-tools ];
               extraBuildInputs = qtBuildInputs;
-              extraPackages = [
+              extraPackages = lib.optionals isLinux [
                 tools.clang-tidy-diff
                 pkgs.include-what-you-use
               ];
