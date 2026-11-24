@@ -37,7 +37,17 @@
           mkStdenv =
             stdenv:
             pkgs.ccacheStdenv.override {
-              stdenv = if isLinux then pkgs.stdenvAdapters.useMoldLinker stdenv else stdenv;
+              stdenv =
+                if isLinux then
+                  pkgs.stdenvAdapters.useMoldLinker stdenv
+                else
+                  stdenv.override {
+                    cc = stdenv.cc.override {
+                      bintools = stdenv.cc.bintools.overrideAttrs {
+                        ld = "${pkgs.llvmPackages.lld}/bin/ld64.lld";
+                      };
+                    };
+                  };
             };
 
           defaultStdenv = mkStdenv pkgs.stdenv;
